@@ -104,6 +104,7 @@ internal static partial class RepeatCorner
                 Wheel = settings.Wheel,
                 LearningWheel = learnWheel != null,
                 LoopArmed = loopSave != null,
+                FindingMarkers = FindingMarkers,
                 CanArm = selected != null && section != null && section.Finish.HasValue,
                 Reloading = reloadInProgress,
                 OverlayPosition = OverlayPositions.Contains(settings.Overlay) ? settings.Overlay : DefaultOverlayPosition,
@@ -164,6 +165,6 @@ internal static partial class RepeatCorner
         public Attempt Best;
         public WheelBinding Wheel;
         public double? Start, Finish;
-        public bool Connected, LearningWheel, LoopArmed, CanArm, Reloading;
+        public bool Connected, LearningWheel, LoopArmed, CanArm, Reloading, FindingMarkers;
     }
 }

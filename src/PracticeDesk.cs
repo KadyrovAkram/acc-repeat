@@ -34,6 +34,8 @@ internal static partial class RepeatCorner
         private readonly PillButton loopButton = new PillButton("Arm loop");
         private readonly PillButton bindButton = new PillButton("Bind wheel");
         private readonly PillButton clearWheel = new PillButton("Clear");
+        private readonly PillButton findMarkers = new PillButton("Find markers");
+        private readonly PillButton tuneMarkers = new PillButton("Fine-tune…");
         private readonly Stepper delay = new Stepper("Countdown", 1, 30, 3);
         private readonly Label connection = Caption("Waiting for ACC", 10);
         private readonly Label checkpointDetail = Caption("", 9);
@@ -63,8 +65,8 @@ internal static partial class RepeatCorner
             Font = new Font("Segoe UI", 10);
             BackColor = Theme.Background;
             ForeColor = Theme.Text;
-            ClientSize = new Size(1000, 660);
-            MinimumSize = new Size(840, 700);
+            ClientSize = new Size(1000, 698);
+            MinimumSize = new Size(840, 738);
             StartPosition = FormStartPosition.CenterScreen;
             Theme.UseDarkTitleBar(this);
 
@@ -91,6 +93,8 @@ internal static partial class RepeatCorner
             loopButton.Click += ToggleLoop;
             bindButton.Click += BindWheel;
             clearWheel.Click += (sender, args) => session.Post(() => ConfigureWheel("clear"));
+            findMarkers.Click += (sender, args) => session.Post(ToggleMarkerSearch);
+            tuneMarkers.Click += OpenTuneDialog;
             refreshTimer.Tick += (sender, args) =>
             {
                 var view = session.Snapshot;
@@ -163,6 +167,7 @@ internal static partial class RepeatCorner
             markers.Padding = new Padding(10, 0, 6, 0);
             markers.Margin = new Padding(0, 0, 6, 0);
             AddRow(sidebar, markers, 34);
+            AddRow(sidebar, TwoColumns(findMarkers, tuneMarkers), 38);
 
             AddRow(sidebar, SectionHeading("Hands-free loop"), 36);
             AddRow(sidebar, status, 30);
@@ -301,6 +306,73 @@ internal static partial class RepeatCorner
             }
         }
 
+        // Moves either marker in 0.1% steps without driving, updating live from the engine.
+        private void OpenTuneDialog(object sender, EventArgs args)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Fine-tune markers", BackColor = Theme.Surface, ForeColor = Theme.Text,
+                Font = Font, ClientSize = new Size(420, 196), FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
+                ShowInTaskbar = false
+            })
+            using (var refresh = new Timer { Interval = 100 })
+            {
+                Theme.UseDarkTitleBar(dialog);
+                dialog.SuspendLayout();
+                var body = Stack(1);
+                body.Padding = new Padding(18, 12, 12, 10);
+                var startValue = Caption("", 11);
+                var finishValue = Caption("", 11);
+                AddRow(body, MarkerStepper("Start", startValue, true), 40);
+                AddRow(body, MarkerStepper("Finish", finishValue, false), 40);
+                var hint = Caption("Each step moves a marker 0.1% of a lap. Moving a marker starts a new run history.", 9);
+                hint.ForeColor = Theme.Muted;
+                hint.TextAlign = ContentAlignment.TopLeft;
+                AddRow(body, hint, 52);
+                var close = new PillButton("Done") { Primary = true, DialogResult = DialogResult.OK };
+                AddRow(body, TwoColumns(new Panel { Margin = Padding.Empty }, close), 40);
+                dialog.Controls.Add(body);
+                dialog.AcceptButton = close;
+                dialog.CancelButton = close;
+                dialog.AutoScaleDimensions = new SizeF(96, 96);
+                dialog.AutoScaleMode = AutoScaleMode.Dpi;
+                dialog.ResumeLayout(true);
+                EventHandler update = (source, tick) =>
+                {
+                    var view = session.Snapshot;
+                    if (view == null) return;
+                    startValue.Text = FormatMarker(view.Start);
+                    finishValue.Text = FormatMarker(view.Finish);
+                };
+                update(null, EventArgs.Empty);
+                refresh.Tick += update;
+                refresh.Start();
+                dialog.ShowDialog(this);
+            }
+        }
+
+        private Control MarkerStepper(string name, Label value, bool start)
+        {
+            var row = Stack(4);
+            row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
+            var label = Caption(name, 10);
+            label.ForeColor = Theme.Muted;
+            var earlier = new PillButton("−") { AccessibleName = "Move " + name.ToLowerInvariant() + " earlier" };
+            var later = new PillButton("+") { AccessibleName = "Move " + name.ToLowerInvariant() + " later" };
+            earlier.Click += (sender, args) => session.Post(() => NudgeMarker(start, -1));
+            later.Click += (sender, args) => session.Post(() => NudgeMarker(start, 1));
+            row.Controls.Add(label, 0, 0);
+            row.Controls.Add(value, 1, 0);
+            row.Controls.Add(earlier, 2, 0);
+            row.Controls.Add(later, 3, 0);
+            return row;
+        }
+
         private void ToggleLoop(object sender, EventArgs args)
         {
             string command = displayed.LoopArmed ? "off" : "on " + delay.Value;
@@ -357,6 +429,7 @@ internal static partial class RepeatCorner
             wheel.Text = view.LearningWheel ? "Press a wheel button now…" : view.Wheel == null ? "No wheel button bound" :
                 "Button " + (view.Wheel.Button + 1) + " · " + view.Wheel.Device;
             bindButton.Text = view.LearningWheel ? "Cancel" : view.Wheel == null ? "Bind wheel" : "Rebind";
+            findMarkers.Text = view.FindingMarkers ? "Cancel search" : "Find markers";
             loopButton.Text = view.LoopArmed ? "Disarm loop" : "Arm loop";
             SetActions(!view.Reloading);
             RenderResults(view);
@@ -364,7 +437,8 @@ internal static partial class RepeatCorner
 
         private void SetActions(bool enabled)
         {
-            checkpoint.Enabled = bindButton.Enabled = overlayPosition.Enabled = enabled;
+            checkpoint.Enabled = bindButton.Enabled = overlayPosition.Enabled = findMarkers.Enabled = enabled;
+            tuneMarkers.Enabled = enabled && displayed.Finish.HasValue;
             pinButton.Enabled = enabled && displayed.AvailableSaves.Length != 0;
             bool wheelBound = displayed != null && displayed.Wheel != null && !displayed.LearningWheel;
             clearWheel.Enabled = enabled && wheelBound;
@@ -412,7 +486,7 @@ internal static partial class RepeatCorner
             emptyHistory.Visible = !hasAttempts;
             emptyHistory.Text = view.Finish.HasValue ? "Cross both timing markers to record a run." :
                 view.Start.HasValue ? "In ACC, press Ctrl+Shift+L after the exit to mark the finish." :
-                "In ACC, mark the start with Ctrl+Shift+K and the finish with Ctrl+Shift+L.";
+                "Select Find markers and drive the corner, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
         }
 
         private static bool IsBest(Attempt run, Attempt best)
