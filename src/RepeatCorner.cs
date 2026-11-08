@@ -95,6 +95,7 @@ internal static partial class RepeatCorner
                             TryMarkSection(message.WParam.ToUInt64() == 2);
                     }
                     PollWheel();
+                    PollMarkerFinder();
                     PollSection();
                     PollLoop();
                     if (desktop != null) desktop.Publish();

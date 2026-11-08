@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 
 internal static class PracticeDrillTests
 {
@@ -73,6 +74,7 @@ internal static partial class RepeatCorner
             "Driven distance was not summed across frames.");
 
         VerifyCutDetection();
+        VerifyMarkerFinder();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
         VerifyLoopCountdown();
@@ -214,6 +216,61 @@ internal static partial class RepeatCorner
         countdown = new LoopCountdown(10, 3);
         DisableLoop("test cancellation");
         Require(countdown == null && loopSave == null, "Stopping the loop left an automatic retry armed.");
+    }
+
+    // A drive from the checkpoint: 200 km/h, braking at 2 s down to 80 km/h, flat out from 4.5 s.
+    private static TelemetryFrame[] CornerRun(double fromPosition, double brakeAt, bool brakes)
+    {
+        const double lap = 5793, step = 0.025;
+        var frames = new System.Collections.Generic.List<TelemetryFrame>();
+        double position = fromPosition, speed = 200;
+        for (int packet = 1; packet * step < 30; packet++)
+        {
+            double time = packet * step;
+            double brake = 0, gas = 0.8;
+            if (brakes && time >= brakeAt && time < brakeAt + 2) { brake = 1; gas = 0; speed = Math.Max(80, speed - 60 * step); }
+            else if (brakes && time >= brakeAt + 2 && time < brakeAt + 2.5) gas = 0.4;
+            else if (!brakes || time >= brakeAt + 2.5) { gas = 1; speed = Math.Min(260, speed + 20 * step); }
+            position = (position + speed / 3.6 * step / lap) % 1;
+            var frame = Frame(packet, position, time, 0, speed);
+            frame.Brake = brake;
+            frame.Gas = gas;
+            frames.Add(frame);
+        }
+        return frames.ToArray();
+    }
+
+    private static double PositionAt(TelemetryFrame[] frames, double time)
+    {
+        foreach (var frame in frames) if (frame.Time >= time - 0.0001) return frame.Position;
+        throw new Exception("Time outside the run.");
+    }
+
+    private static void VerifyMarkerFinder()
+    {
+        var run = CornerRun(0.10, 2.0, true);
+        var finder = new MarkerFinder();
+        bool done = false;
+        foreach (var frame in run) if (!done) done = finder.Observe(frame);
+        Require(done && finder.Failure == null, "The marker finder did not finish a normal corner.");
+        Require(Math.Abs(finder.BrakePoint.Value - PositionAt(run, 2.0)) < 0.00001, "The braking point is wrong.");
+        Require(Math.Abs(finder.Start.Value - PositionAt(run, 1.5)) < 0.00001, "The start was not placed half a second before braking.");
+        Require(Math.Abs(finder.Finish.Value - PositionAt(run, 5.5)) < 0.00002, "The finish was not placed after a second flat out.");
+
+        // A retry partway through starts the search again from the checkpoint.
+        finder = new MarkerFinder();
+        foreach (var frame in CornerRun(0.30, 1.0, false).Take(20)) finder.Observe(frame);
+        var retried = CornerRun(0.10, 2.0, true);
+        foreach (var frame in retried) { frame.Packet += 1000; frame.Time += 10; }
+        done = false;
+        foreach (var frame in retried) if (!done) done = finder.Observe(frame);
+        Require(done && Math.Abs(finder.Start.Value - PositionAt(retried, 11.5)) < 0.00001,
+            "A reload during the search did not restart it.");
+
+        finder = new MarkerFinder();
+        done = false;
+        foreach (var frame in CornerRun(0.10, 0, false)) if (!done) done = finder.Observe(frame);
+        Require(!done || finder.Failure != null, "A run without braking placed markers.");
     }
 
     private static void VerifyCutDetection()
