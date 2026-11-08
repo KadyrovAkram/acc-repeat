@@ -33,7 +33,13 @@ Pins refer to ACC's original saves. Keep the chosen save among the first five ro
 2. With ACC focused, press **Ctrl+Shift+K** just before braking and **Ctrl+Shift+L** after the exit. You can mark a point while paused on track.
 3. Retry and cross both marks in order. The Practice desk shows the section time, speeds at both marks, and saved marker positions.
 
-Markers belong to the active pin or, in latest-save mode, the current track. Marking a new start clears that drill's previous finish. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
+Markers belong to the active pin or, in latest-save mode, the current track, and are saved with it. You only need to place them once per checkpoint. Marking a new start clears that drill's previous finish.
+
+### Place markers on the track map
+
+Instead of pressing the shortcuts at the right moment, select **Place on map…** on the Practice desk. Choose **Start** or **Finish**, then click the track where you want that marker. The highlighted stretch between them is the timed section. Select **Save markers** to use them. Moving either marker starts a new run history.
+
+ACC doesn't provide track outlines, so the tool draws each map from your car's position while you drive with ACC focused. Drive one full lap on a new track to complete its map. Until then, the dialog shows how much is recorded, and you can only place markers on the parts you've driven. Maps are saved per track in `RepeatCorner.maps.json` beside the executable. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
 
 ### Review your runs
 
