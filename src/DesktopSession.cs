@@ -106,6 +106,10 @@ internal static partial class RepeatCorner
                 LoopArmed = loopSave != null,
                 CanArm = selected != null && section != null && section.Finish.HasValue,
                 Reloading = reloadInProgress,
+                OverlayPosition = OverlayPositions.Contains(settings.Overlay) ? settings.Overlay : DefaultOverlayPosition,
+                LiveStart = timer.StartedAt,
+                Countdown = countdown == null || countdown.IsSuspended || countdown.RemainingSeconds < 0 ?
+                    (int?)null : countdown.RemainingSeconds,
                 Status = DescribeStatus(connected, selected),
                 Detail = reloadInProgress ? "Hold F9 to cancel the reload." : message,
                 ShortcutWarning = shortcutWarning
