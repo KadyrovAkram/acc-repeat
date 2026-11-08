@@ -41,7 +41,9 @@ History is stored with the timing markers in `RepeatCorner.settings.json`. Chang
 
 With both timing markers set, type `loop on` in the console and return to ACC. Retry once to start from the selected checkpoint. After each timed finish, the tool reads out your time, gives a three-second countdown, and reloads that checkpoint. Use `loop on 5` for a five-second countdown. The console shows the countdown, and the voice reads the final three seconds.
 
-Tap **F9** in ACC or type `loop off` to turn the loop off. Press your wheel button or **Ctrl+Shift+J** to retry early and keep looping. The loop starts off each time you launch the tool. Switching checkpoints, changing the markers, or leaving live practice during a countdown turns it off.
+Alt+Tab to check your results whenever you like. A pending countdown pauses while ACC is out of focus and resumes with the remaining time when you return to live driving. If ACC paused itself, select **Drive** to continue the countdown.
+
+Tap **F9** in ACC or type `loop off` to turn the loop off. Press your wheel button or **Ctrl+Shift+J** to retry early and keep looping. The loop starts off each time you launch the tool. Switching checkpoints, changing the markers, or leaving the practice session turns it off during a countdown.
 
 ## Screenshots
 
