@@ -15,6 +15,8 @@ Download the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/
 
 By default, Retry uses the newest entry in **Saved Games**, which must be a Free Practice save. Save earlier on the approach if you need more room to settle the car after loading.
 
+Keep floating windows clear of ACC's menu buttons. If a window covers **Play** after **Saved Games** opens, move it away and press **Ctrl+Shift+J** again with ACC focused.
+
 ## Bind a wheel button
 
 Connect your wheel, select **Bind wheel**, then press the wheel button you want to use within 15 seconds. Pick a spare button. With ACC focused, press it once to retry. The Practice desk shows the bound button. Select **Clear** to remove the binding.
