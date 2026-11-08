@@ -230,7 +230,7 @@ internal static partial class RepeatCorner
             using (var dialog = new Form
             {
                 Text = "Pin a Free Practice save", BackColor = Surface, ForeColor = TextColor,
-                Font = Font, ClientSize = new Size(495, 220), FormBorderStyle = FormBorderStyle.FixedDialog,
+                Font = Font, ClientSize = new Size(495, 193), FormBorderStyle = FormBorderStyle.FixedDialog,
                 StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
                 ShowInTaskbar = false
             })
@@ -324,7 +324,6 @@ internal static partial class RepeatCorner
                 "Button " + (view.Wheel.Button + 1) + " · " + view.Wheel.Device;
             bindButton.Text = view.LearningWheel ? "Cancel" : "Bind wheel";
             loopButton.Text = view.LoopArmed ? "Disarm loop" : "Arm loop";
-            loopButton.BackColor = view.LoopArmed ? Inset : Red;
             SetActions(!view.Reloading);
             RenderResults(view);
         }
@@ -335,6 +334,7 @@ internal static partial class RepeatCorner
             pinButton.Enabled = enabled && displayed.AvailableSaves.Length != 0;
             clearWheel.Enabled = enabled && displayed.Wheel != null;
             loopButton.Enabled = enabled && (displayed.CanArm || displayed.LoopArmed);
+            loopButton.BackColor = loopButton.Enabled && !displayed.LoopArmed ? Red : Inset;
             delay.Enabled = enabled && !displayed.LoopArmed;
         }
 
@@ -371,6 +371,8 @@ internal static partial class RepeatCorner
             bool hasAttempts = view.Recent.Length != 0;
             history.Visible = hasAttempts;
             emptyHistory.Visible = !hasAttempts;
+            emptyHistory.Text = view.Finish.HasValue ? "Cross both timing markers to record a run." :
+                "In ACC, mark the start with Ctrl+Shift+K and the finish with Ctrl+Shift+L.";
         }
 
         private static bool IsBest(Attempt run, Attempt best)
