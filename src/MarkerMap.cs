@@ -44,6 +44,7 @@ internal static partial class RepeatCorner
 
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Margin = Padding.Empty, Padding = new Padding(16, 10, 10, 10) };
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
 
@@ -63,6 +64,25 @@ internal static partial class RepeatCorner
             top.Controls.Add(placeStart, 2, 0);
             top.Controls.Add(placeFinish, 3, 0);
 
+            var mapTools = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, Margin = Padding.Empty };
+            mapTools.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
+            mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
+            mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
+            mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var zoomOut = new PillButton("−") { AccessibleName = "Zoom out" };
+            var zoomIn = new PillButton("+") { AccessibleName = "Zoom in" };
+            var fitTrack = new PillButton("Fit") { AccessibleName = "Fit whole track" };
+            var mapHelp = new Label
+            {
+                Text = "Scroll to zoom · Right-drag to pan", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Theme.Muted, Margin = new Padding(6, 0, 0, 0), UseMnemonic = false, AutoEllipsis = true
+            };
+            mapTools.Controls.Add(zoomOut, 0, 0);
+            mapTools.Controls.Add(zoomIn, 1, 0);
+            mapTools.Controls.Add(fitTrack, 2, 0);
+            mapTools.Controls.Add(mapHelp, 3, 0);
+
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Margin = Padding.Empty };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -74,8 +94,9 @@ internal static partial class RepeatCorner
             bottom.Controls.Add(save, 2, 0);
 
             root.Controls.Add(top, 0, 0);
-            root.Controls.Add(canvas, 0, 1);
-            root.Controls.Add(bottom, 0, 2);
+            root.Controls.Add(mapTools, 0, 1);
+            root.Controls.Add(canvas, 0, 2);
+            root.Controls.Add(bottom, 0, 3);
             Controls.Add(root);
             CancelButton = cancel;
             AutoScaleDimensions = new SizeF(96, 96);
@@ -85,6 +106,9 @@ internal static partial class RepeatCorner
             placeStart.Click += (sender, args) => SetMode(true);
             placeFinish.Click += (sender, args) => SetMode(false);
             importMap.Click += ImportMap;
+            zoomOut.Click += (sender, args) => canvas.ZoomBy(-1);
+            zoomIn.Click += (sender, args) => canvas.ZoomBy(1);
+            fitTrack.Click += (sender, args) => canvas.ResetZoom();
             canvas.Picked += Place;
             save.Click += Save;
             refresh.Tick += (sender, args) =>
@@ -104,6 +128,13 @@ internal static partial class RepeatCorner
         {
             if (disposing) refresh.Dispose();
             base.Dispose(disposing);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            // WinForms can send the wheel event to the focused button's parent.
+            canvas.ZoomFromWheel(e, canvas.PointToClient(PointToScreen(e.Location)));
+            base.OnMouseWheel(e);
         }
 
         private async void ImportMap(object sender, EventArgs args)
@@ -211,9 +242,16 @@ internal static partial class RepeatCorner
         public double? Finish { get; set; }
         public bool PlacingStart = true;
         public event Action<double> Picked;
+        private const double ZoomStep = 1.25, MaxZoom = 12;
+        private double zoom = 1;
+        private PointF? zoomCenter;
+        private PointF worldCenter;
+        private MouseButtons panButton;
+        private Point lastPanPoint;
         private double? hover;
-        private float scale, offsetX, offsetY;
-        private double minX, minZ;
+        private float scale;
+
+        private PointF ViewCenter { get { return new PointF(Width / 2f, Height / 2f); } }
 
         public MapCanvas()
         {
@@ -226,11 +264,11 @@ internal static partial class RepeatCorner
             AccessibleRole = AccessibleRole.Graphic;
         }
 
-        private bool Fit(float pad)
+        private bool UpdateTransform(float pad)
         {
             if (Map == null || Map.IsEmpty) return false;
             double maxX = double.MinValue, maxZ = double.MinValue;
-            minX = minZ = double.MaxValue;
+            double minX = double.MaxValue, minZ = double.MaxValue;
             for (int index = 0; index < MapBins; index++)
             {
                 if (!Map.Filled[index]) continue;
@@ -238,27 +276,118 @@ internal static partial class RepeatCorner
                 minZ = Math.Min(minZ, Map.Z[index]); maxZ = Math.Max(maxZ, Map.Z[index]);
             }
             double width = Math.Max(1, maxX - minX), depth = Math.Max(1, maxZ - minZ);
-            scale = (float)Math.Min((Width - 2 * pad) / width, (Height - 2 * pad) / depth);
-            offsetX = (float)((Width - width * scale) / 2);
-            offsetY = (float)((Height - depth * scale) / 2);
+            scale = (float)(Math.Min((Width - 2 * pad) / width, (Height - 2 * pad) / depth) * zoom);
+            worldCenter = zoomCenter ?? new PointF((float)(minX + width / 2), (float)(minZ + depth / 2));
             return scale > 0;
         }
 
         private PointF ToScreen(PointF world)
         {
-            return new PointF(offsetX + (float)(world.X - minX) * scale, offsetY + (float)(world.Y - minZ) * scale);
+            var center = ViewCenter;
+            return new PointF(center.X + (world.X - worldCenter.X) * scale, center.Y + (world.Y - worldCenter.Y) * scale);
+        }
+
+        private PointF ToWorld(PointF screen)
+        {
+            var center = ViewCenter;
+            return new PointF(worldCenter.X + (screen.X - center.X) / scale, worldCenter.Y + (screen.Y - center.Y) / scale);
+        }
+
+        public void ZoomBy(double steps, PointF? location = null)
+        {
+            if (!UpdateTransform(36 * DeviceScale())) return;
+            double next = Math.Max(1, Math.Min(MaxZoom, zoom * Math.Pow(ZoomStep, steps)));
+            if (next <= 1)
+            {
+                ResetZoom();
+                return;
+            }
+            if (next == zoom) return;
+
+            var anchor = location ?? ViewCenter;
+            var world = ToWorld(anchor);
+            var center = ViewCenter;
+            float nextScale = (float)(scale * next / zoom);
+            zoomCenter = new PointF(world.X - (anchor.X - center.X) / nextScale,
+                world.Y - (anchor.Y - center.Y) / nextScale);
+            zoom = next;
+            hover = null;
+            Invalidate();
+        }
+
+        public void ResetZoom()
+        {
+            zoom = 1;
+            zoomCenter = null;
+            hover = null;
+            Invalidate();
+        }
+
+        public void ZoomFromWheel(MouseEventArgs e, Point location)
+        {
+            if (!ClientRectangle.Contains(location) || Map == null || Map.IsEmpty) return;
+            ZoomBy(e.Delta / (double)SystemInformation.MouseWheelScrollDelta, location);
+            var handled = e as HandledMouseEventArgs;
+            if (handled != null) handled.Handled = true;
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            ZoomFromWheel(e, e.Location);
+            base.OnMouseWheel(e);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (zoom == 1 || (e.Button != MouseButtons.Right && e.Button != MouseButtons.Middle)) return;
+            panButton = e.Button;
+            lastPanPoint = e.Location;
+            Capture = true;
+            Cursor = Cursors.SizeAll;
+            hover = null;
+            Invalidate();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (e.Button == panButton) Capture = false;
+        }
+
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            base.OnMouseCaptureChanged(e);
+            if (Capture || panButton == MouseButtons.None) return;
+            panButton = MouseButtons.None;
+            Cursor = Cursors.Cross;
+        }
+
+        private double? MarkerAt(Point location)
+        {
+            float dpi = DeviceScale();
+            if (!UpdateTransform(36 * dpi)) return null;
+            var world = ToWorld(location);
+            double gap;
+            var nearest = Map.Nearest(world.X, world.Y, out gap);
+            return gap * scale < 28 * dpi ? nearest : null;
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            double? next = null;
-            if (Fit(Pad()))
+            if (panButton != MouseButtons.None)
             {
-                double gap;
-                var nearest = Map.Nearest(minX + (e.X - offsetX) / scale, minZ + (e.Y - offsetY) / scale, out gap);
-                if (nearest.HasValue && gap * scale < 28 * DeviceScale()) next = nearest;
+                if (UpdateTransform(36 * DeviceScale()))
+                {
+                    var center = ViewCenter;
+                    zoomCenter = ToWorld(new PointF(center.X + lastPanPoint.X - e.X, center.Y + lastPanPoint.Y - e.Y));
+                    lastPanPoint = e.Location;
+                    Invalidate();
+                }
+                return;
             }
+            double? next = MarkerAt(e.Location);
             if (next != hover)
             {
                 hover = next;
@@ -276,7 +405,9 @@ internal static partial class RepeatCorner
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
-            if (e.Button == MouseButtons.Left && hover.HasValue && Picked != null) Picked(hover.Value);
+            if (e.Button != MouseButtons.Left || panButton != MouseButtons.None || Picked == null) return;
+            var position = MarkerAt(e.Location);
+            if (position.HasValue) Picked(position.Value);
         }
 
         private float DeviceScale()
@@ -284,15 +415,13 @@ internal static partial class RepeatCorner
             using (var graphics = CreateGraphics()) return graphics.DpiX / 96f;
         }
 
-        private float Pad() { return 36 * DeviceScale(); }
-
         protected override void OnPaint(PaintEventArgs e)
         {
             var graphics = e.Graphics;
             float dpi = Theme.Scale(graphics);
             graphics.Clear(BackColor);
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            if (!Fit(36 * dpi))
+            if (!UpdateTransform(36 * dpi))
             {
                 string message = "No map of " + (Map == null ? "this track" : Map.Track) + " yet.\n\n" +
                     "Import a map file or drive a lap with Repeat Corner open.";
