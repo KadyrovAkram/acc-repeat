@@ -15,6 +15,7 @@ internal static partial class RepeatCorner
         public static readonly Color Surface = Color.FromArgb(33, 35, 40);
         public static readonly Color Inset = Color.FromArgb(45, 47, 55);
         public static readonly Color Hover = Color.FromArgb(57, 60, 69);
+        public static readonly Color RowHover = Color.FromArgb(38, 40, 46);
         public static readonly Color Line = Color.FromArgb(52, 54, 62);
         public static readonly Color Text = Color.FromArgb(244, 244, 248);
         public static readonly Color Muted = Color.FromArgb(163, 166, 178);
@@ -26,6 +27,14 @@ internal static partial class RepeatCorner
         public static readonly Color Amber = Color.FromArgb(242, 178, 92);
 
         public static float Scale(Graphics graphics) { return graphics.DpiX / 96f; }
+
+        public static Color Blend(Color first, Color second, float amount)
+        {
+            return Color.FromArgb(
+                (int)(first.R + (second.R - first.R) * amount),
+                (int)(first.G + (second.G - first.G) * amount),
+                (int)(first.B + (second.B - first.B) * amount));
+        }
 
         public static GraphicsPath Rounded(RectangleF bounds, float radius)
         {
@@ -128,7 +137,7 @@ internal static partial class RepeatCorner
             Color fill, text = Theme.Text;
             if (!Enabled)
             {
-                fill = Theme.ParentColor(this);
+                fill = Theme.Blend(Theme.Inset, Theme.ParentColor(this), 0.5f);
                 text = Theme.Faint;
             }
             else if (primary)
@@ -395,11 +404,12 @@ internal static partial class RepeatCorner
             graphics.Clear(BackColor);
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             int rowHeight = RowHeight, headerHeight = HeaderHeight;
-            float[] widths = { 0.17f, 0.18f, 0.35f, 0.15f, 0.15f };
+            float[] widths = { 0.15f, 0.17f, 0.34f, 0.17f, 0.17f };
+            int tableWidth = Math.Max(0, Width - (int)(RemoveBox(0).Width + 12 * scale));
             var columns = new int[widths.Length + 1];
             for (int index = 0; index < widths.Length; index++)
-                columns[index + 1] = columns[index] + (int)(Width * widths[index]);
-            columns[widths.Length] = Width;
+                columns[index + 1] = columns[index] + (int)(tableWidth * widths[index]);
+            columns[widths.Length] = tableWidth;
 
             using (var small = new Font(Font.FontFamily, 8.5f))
             using (var bold = new Font(Font, FontStyle.Bold))
@@ -419,8 +429,8 @@ internal static partial class RepeatCorner
                     var run = rows[row];
                     int top = headerHeight + row * rowHeight;
                     bool personalBest = IsPersonalBest(run);
-                    if (row == 0)
-                        using (var highlight = new SolidBrush(Theme.Surface))
+                    if (row == 0 || row == hoverRow)
+                        using (var highlight = new SolidBrush(row == 0 && row != hoverRow ? Theme.Surface : Theme.RowHover))
                             graphics.FillRectangle(highlight, 0, top, Width, rowHeight - 1);
                     var color = personalBest ? Theme.Green : Theme.Text;
                     Cell(graphics, RunLabel(row), row == 0 ? bold : Font, row == 0 ? Theme.Text : Theme.Muted, columns, 0, top, rowHeight);

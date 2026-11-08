@@ -118,6 +118,7 @@ internal static partial class RepeatCorner
                 LearningWheel = learnWheel != null,
                 LoopArmed = loopSave != null,
                 Track = track,
+                TrackName = selected != null && selected.TrackDisplayName != null ? selected.TrackDisplayName : track,
                 Map = MapView(track),
                 CanArm = selected != null && section != null && section.Finish.HasValue,
                 Reloading = reloadInProgress,
@@ -161,14 +162,14 @@ internal static partial class RepeatCorner
                     "Auto-retry in " + countdown.RemainingSeconds + " s";
             }
             if (loopSave != null) return "Loop armed";
-            if (!connected) return "Waiting for ACC";
+            if (!connected) return "Start ACC to use the loop";
             return selected == null ? "Choose a practice save" : "Ready · loop off";
         }
     }
 
     private sealed class DeskSnapshot
     {
-        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition, Track;
+        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition, Track, TrackName;
         public TrackMapView Map;
         public double? LiveStart;
         public int? Countdown;
