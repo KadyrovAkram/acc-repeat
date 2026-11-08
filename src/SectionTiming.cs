@@ -63,6 +63,44 @@ internal static partial class RepeatCorner
         }
     }
 
+    // Sets both markers for the active drill without driving to them. Moving the start
+    // or the finish starts a new history, as it does when marking on track.
+    private static void ApplyMarkers(string track, double start, double finish, string message)
+    {
+        start = WrapPosition(start);
+        finish = WrapPosition(finish);
+        var pin = ActiveCheckpoint();
+        if (pin != null && !SameTrack(pin.Track, track))
+            throw new InvalidOperationException("Load the active checkpoint's track before setting the section.");
+        double span = SectionTimer.ForwardDistance(start, finish);
+        if (span < 0.0002 || span >= 0.5)
+            throw new InvalidOperationException("The finish must be ahead of the start and within half a lap.");
+
+        var section = CurrentSection(track);
+        if (section == null)
+        {
+            section = new Section { Checkpoint = settings.ActiveCheckpoint, Track = track, Start = start };
+            settings.Sections.Add(section);
+        }
+        else if (section.Start != start)
+        {
+            section.Start = start;
+            section.RecentAttempts.Clear();
+            section.BestAttempt = null;
+        }
+        SetFinish(section, finish);
+        StoreSettings();
+        timer.Reset();
+        DisableLoop("timing markers changed");
+        ReportStatus(message);
+    }
+
+    private static double WrapPosition(double position)
+    {
+        position %= 1;
+        return position < 0 ? position + 1 : position;
+    }
+
     private static bool SameTrack(string left, string right)
     {
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
