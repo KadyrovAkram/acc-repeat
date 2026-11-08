@@ -34,6 +34,7 @@ internal static partial class RepeatCorner
         private readonly PillButton loopButton = new PillButton("Arm loop");
         private readonly PillButton bindButton = new PillButton("Bind wheel");
         private readonly PillButton clearWheel = new PillButton("Clear");
+        private readonly PillButton mapMarkers = new PillButton("Place on map…");
         private readonly Stepper delay = new Stepper("Countdown", 1, 30, 3);
         private readonly Label connection = Caption("Waiting for ACC", 10);
         private readonly Label checkpointDetail = Caption("", 9);
@@ -63,8 +64,8 @@ internal static partial class RepeatCorner
             Font = new Font("Segoe UI", 10);
             BackColor = Theme.Background;
             ForeColor = Theme.Text;
-            ClientSize = new Size(1000, 660);
-            MinimumSize = new Size(840, 700);
+            ClientSize = new Size(1000, 698);
+            MinimumSize = new Size(840, 738);
             StartPosition = FormStartPosition.CenterScreen;
             Theme.UseDarkTitleBar(this);
 
@@ -91,6 +92,10 @@ internal static partial class RepeatCorner
             loopButton.Click += ToggleLoop;
             bindButton.Click += BindWheel;
             clearWheel.Click += (sender, args) => session.Post(() => ConfigureWheel("clear"));
+            mapMarkers.Click += (sender, args) =>
+            {
+                using (var dialog = new MarkerMapDialog(session, displayed, Font)) dialog.ShowDialog(this);
+            };
             refreshTimer.Tick += (sender, args) =>
             {
                 var view = session.Snapshot;
@@ -163,6 +168,7 @@ internal static partial class RepeatCorner
             markers.Padding = new Padding(10, 0, 6, 0);
             markers.Margin = new Padding(0, 0, 6, 0);
             AddRow(sidebar, markers, 34);
+            AddRow(sidebar, mapMarkers, 38);
 
             AddRow(sidebar, SectionHeading("Hands-free loop"), 36);
             AddRow(sidebar, status, 30);
@@ -365,6 +371,7 @@ internal static partial class RepeatCorner
         private void SetActions(bool enabled)
         {
             checkpoint.Enabled = bindButton.Enabled = overlayPosition.Enabled = enabled;
+            mapMarkers.Enabled = enabled && displayed.Track != null;
             pinButton.Enabled = enabled && displayed.AvailableSaves.Length != 0;
             bool wheelBound = displayed != null && displayed.Wheel != null && !displayed.LearningWheel;
             clearWheel.Enabled = enabled && wheelBound;
@@ -412,7 +419,7 @@ internal static partial class RepeatCorner
             emptyHistory.Visible = !hasAttempts;
             emptyHistory.Text = view.Finish.HasValue ? "Cross both timing markers to record a run." :
                 view.Start.HasValue ? "In ACC, press Ctrl+Shift+L after the exit to mark the finish." :
-                "In ACC, mark the start with Ctrl+Shift+K and the finish with Ctrl+Shift+L.";
+                "Select Place on map to click the markers onto the track, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
         }
 
         private static bool IsBest(Attempt run, Attempt best)
