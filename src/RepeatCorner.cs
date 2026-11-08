@@ -136,6 +136,7 @@ internal static partial class RepeatCorner
         CancelLoopCountdown();
         timer.Reset();
         reloadInProgress = true;
+        HideOverlayNow();
         reloadTimeAway = 0;
         reloadFocusVersion = 0;
         layout = null;
@@ -149,6 +150,7 @@ internal static partial class RepeatCorner
         {
             reloadWaitingForFocus = false;
             reloadInProgress = false;
+            overlaySuppressed = false;
         }
         wheelArmed = false;
         Message pending;
