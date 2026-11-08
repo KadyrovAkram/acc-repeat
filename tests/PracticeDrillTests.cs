@@ -59,6 +59,31 @@ internal static partial class RepeatCorner
             "An interrupted run counted after resuming mid-section.");
 
         VerifyAttemptHistory(result);
+        VerifyLoopCountdown();
+    }
+
+    private static void VerifyLoopCountdown()
+    {
+        var pending = new LoopCountdown(10, 3);
+        Require(!pending.Update(11, false).HasValue, "The countdown started while the result was speaking.");
+        Require(pending.Update(12, true) == 3, "The countdown did not start when the result finished.");
+        Require(!pending.Update(12.5, true).HasValue, "A countdown number was announced twice.");
+        Require(pending.Update(13, true) == 2 && pending.Update(14, true) == 1,
+            "The countdown did not report the remaining seconds.");
+        Require(pending.Update(15, true) == 0 && !pending.Update(16, true).HasValue,
+            "The countdown did not trigger exactly one retry.");
+
+        var stalledVoice = new LoopCountdown(10, 2);
+        Require(!stalledVoice.Update(15.9, false).HasValue && stalledVoice.Update(16, false) == 2 &&
+            stalledVoice.Update(18, false) == 0, "A stalled voice could block the countdown.");
+
+        loopSave = new Save { Slot = "4", Created = "selected", Track = "monza" };
+        countdown = new LoopCountdown(10, 3);
+        CancelLoopCountdown();
+        Require(countdown == null && loopSave != null, "A manual retry did not cancel only the pending countdown.");
+        countdown = new LoopCountdown(10, 3);
+        DisableLoop("test cancellation");
+        Require(countdown == null && loopSave == null, "Stopping the loop left an automatic retry armed.");
     }
 
     private static void VerifyAttemptHistory(Attempt completedRun)
