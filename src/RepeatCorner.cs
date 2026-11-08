@@ -152,10 +152,7 @@ internal static partial class RepeatCorner
         WaitFor("Quit confirmation", ConfirmQuit, 3);
         stage = "confirming Quit";
         Click(597, 514, ConfirmQuit);
-        WaitFor("main menu", HomeMenu, 45, HomeMenuHovered);
-        stage = "opening Saved Games";
-        Click(522, 638, HomeMenu, HomeMenuHovered);
-        WaitFor("Saved Games", SavedGamesTitle, 6);
+        OpenSavedGames();
         stage = "selecting Play on the checkpoint row";
         Click(1099, 237 + checkpoint.Row * 61, SavedGamesTitle, checkpoint: checkpoint);
         WaitFor("restored checkpoint and Drive button", PracticeMenu, 90);
@@ -192,21 +189,44 @@ internal static partial class RepeatCorner
         }
     }
 
-    private static void WaitFor(string name, Signature[] signatures, int seconds, Signature[] alternative = null)
+    private static void OpenSavedGames()
     {
-        stage = "waiting for " + name;
-        double started = ReloadTime;
-        while (!MatchesEither(signatures, alternative))
+        WaitFor("main menu", HomeMenu, 45);
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
-            if (ReloadTime - started >= seconds)
-                throw new InvalidOperationException("Could not recognize " + name + ".");
-            Thread.Sleep(125);
+            stage = "opening Saved Games (attempt " + attempt + " of 3)";
+            Click(570, 666, HomeMenu);
+            if (WaitForMenu(SavedGamesTitle, 2)) return;
+
+            // Retry only if ACC still shows the main menu. A late transition may already be underway.
+            if (!Matches(HomeMenu))
+            {
+                WaitFor("Saved Games after leaving the main menu", SavedGamesTitle, 6);
+                return;
+            }
+            if (attempt < 3)
+                Console.WriteLine("ACC is still on the main menu. Retrying Saved Games.");
         }
+        throw new InvalidOperationException("ACC stayed on the main menu after three Saved Games clicks.");
     }
 
-    private static bool MatchesEither(Signature[] expected, Signature[] alternative)
+    private static void WaitFor(string name, Signature[] signatures, int seconds)
     {
-        return Matches(expected) || (alternative != null && Matches(alternative));
+        stage = "waiting for " + name;
+        if (!WaitForMenu(signatures, seconds))
+            throw new InvalidOperationException("Could not recognize " + name + ".");
+    }
+
+    private static bool WaitForMenu(Signature[] signatures, int seconds)
+    {
+        double started = ReloadTime;
+        while (!Matches(signatures))
+        {
+            if (ReloadTime - started >= seconds)
+                return false;
+            Thread.Sleep(125);
+        }
+        return true;
     }
 
     private static bool Matches(Signature[] signatures, int yOffset = 0, double brightCoverage = 0.70)
@@ -341,7 +361,7 @@ internal static partial class RepeatCorner
         Console.WriteLine("ACC focused. Checking the menu before continuing.");
     }
 
-    private static void Click(int x, int y, Signature[] expected, Signature[] alternative = null, Save checkpoint = null)
+    private static void Click(int x, int y, Signature[] expected, Save checkpoint = null)
     {
         double started = ReloadTime;
         while (ReloadTime - started < 4)
@@ -349,12 +369,12 @@ internal static partial class RepeatCorner
             EnsureGame();
             int focusVersion = reloadFocusVersion;
             var point = new Point(origin.X + x * scale, origin.Y + y * scale);
-            if (MatchesEither(expected, alternative) && GetForegroundWindow() == game &&
+            if (Matches(expected) && GetForegroundWindow() == game &&
                 WindowFromPoint(point) == game && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
             {
                 // Hover reveals Play. Verify the same screen again before sending the click.
                 Thread.Sleep(65);
-                if (MatchesEither(expected, alternative) && (checkpoint == null || MatchesSaveRow(checkpoint.Row * 61)))
+                if (Matches(expected) && (checkpoint == null || MatchesSaveRow(checkpoint.Row * 61)))
                 {
                     EnsureGame();
                     if (checkpoint != null)
