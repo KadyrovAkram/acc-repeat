@@ -19,6 +19,7 @@ internal static partial class RepeatCorner
         public List<Section> Sections = new List<Section>();
         public string ActiveCheckpoint;
         public WheelBinding Wheel;
+        public string Overlay;
     }
 
     public sealed class Checkpoint
