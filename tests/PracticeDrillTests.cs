@@ -77,6 +77,7 @@ internal static partial class RepeatCorner
         VerifyCutDetection();
         VerifyTrackMap();
         VerifyTrackMapImport();
+        VerifyBundledTrackMaps();
         VerifyRunRemoval();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
@@ -310,6 +311,45 @@ internal static partial class RepeatCorner
         {
             File.Delete(path);
             Directory.Delete(directory);
+        }
+    }
+
+    private static void VerifyBundledTrackMaps()
+    {
+        var files = Directory.GetFiles(BundledMapsPath, "*.bin");
+        Require(files.Length == 25, "The build did not include all 25 track maps.");
+        foreach (string file in files)
+        {
+            string track = Path.GetFileNameWithoutExtension(file);
+            Require(MapView(track).Coverage == 1, "The bundled map did not load for " + track + ".");
+        }
+
+        var monza = MapView("monza");
+        foreach (double position in new[] { 0.0405, 0.1807 })
+        {
+            var point = monza.PointAt(position).Value;
+            double gap;
+            var picked = monza.Nearest(point.X, point.Y, out gap);
+            Require(picked.HasValue && Math.Abs(position - picked.Value) < 0.00001,
+                "The bundled Monza map moved a timing marker.");
+        }
+        Require(MapView("nurburgring").PointAt(0.5) != MapView("nurburgring_24h").PointAt(0.5),
+            "The Nürburgring layouts shared the same map.");
+        Require(MapView("unmapped_track").IsEmpty, "An unknown track loaded a different circuit's map.");
+
+        var recorded = new TrackMap { Track = "monza" };
+        var custom = new TrackMap { Track = "monza", Imported = true };
+        trackMaps.Add(recorded);
+        try
+        {
+            Require(FindTrackMap("monza") != recorded, "A partial recording hid the bundled map.");
+            trackMaps.Add(custom);
+            Require(FindTrackMap("monza") == custom, "A bundled map hid the user's imported map.");
+        }
+        finally
+        {
+            trackMaps.Remove(custom);
+            trackMaps.Remove(recorded);
         }
     }
 

@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Web.Script.Serialization;
 
-// Maps imported or drawn from ACC telemetry share one point per 0.1% of the lap.
+// Bundled maps, imports, and recordings share one point per 0.1% of the lap.
 internal static partial class RepeatCorner
 {
     private const int MapBins = 1000;
@@ -106,6 +106,7 @@ internal static partial class RepeatCorner
     private static TrackMap FindTrackMap(string track)
     {
         return trackMaps.Find(map => map.Imported && SameTrack(map.Track, track)) ??
+            FindBundledTrackMap(track) ??
             trackMaps.Find(map => SameTrack(map.Track, track));
     }
 

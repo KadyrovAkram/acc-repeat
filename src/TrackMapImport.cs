@@ -5,9 +5,31 @@ using System.Linq;
 
 internal static partial class RepeatCorner
 {
+    private static readonly string BundledMapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Maps");
+    private static readonly Dictionary<string, TrackMap> bundledMaps =
+        new Dictionary<string, TrackMap>(StringComparer.OrdinalIgnoreCase);
+
     private struct ImportedMapPoint
     {
         public double X, Z, Position;
+    }
+
+    private static TrackMap FindBundledTrackMap(string track)
+    {
+        if (string.IsNullOrEmpty(track) || track.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
+        TrackMap map;
+        if (bundledMaps.TryGetValue(track, out map)) return map;
+
+        string path = Path.Combine(BundledMapsPath, track + ".bin");
+        try
+        {
+            if (File.Exists(path)) map = ReadTrackMapFile(track, path);
+        }
+        catch (InvalidDataException error) { ReportStatus("Could not load the bundled map for " + track + ". " + error.Message); }
+        catch (IOException error) { ReportStatus("Could not read the bundled map for " + track + ". " + error.Message); }
+        catch (UnauthorizedAccessException error) { ReportStatus("Could not read the bundled map for " + track + ". " + error.Message); }
+        bundledMaps[track] = map;
+        return map;
     }
 
     private static TrackMapView ImportTrackMap(string track, string path)

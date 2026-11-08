@@ -207,7 +207,8 @@ internal static partial class RepeatCorner
     private sealed class MapCanvas : Control
     {
         public TrackMapView Map;
-        public double? Start, Finish;
+        public double? Start { get; set; }
+        public double? Finish { get; set; }
         public bool PlacingStart = true;
         public event Action<double> Picked;
         private double? hover;
