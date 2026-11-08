@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 
 internal static class PracticeDrillTests
 {
@@ -60,6 +61,61 @@ internal static partial class RepeatCorner
 
         VerifyAttemptHistory(result);
         VerifyLoopCountdown();
+        VerifyMenuLayouts();
+        VerifyMenuSignaturePadding();
+    }
+
+    private static void VerifyMenuLayouts()
+    {
+        var fullHd = MenuLayout.Select(new Size(1920, 1080));
+        var quadHd = MenuLayout.Select(new Size(2560, 1440));
+        var original = MenuLayout.Select(new Size(2880, 1800));
+        Require(fullHd.ToClient(fullHd.QuitButton) == new Point(959, 768) &&
+            quadHd.ToClient(quadHd.QuitButton) == new Point(1278, 1024),
+            "The 16:9 pause controls are out of place.");
+        Require(original.ToClient(original.SavedGamesButton) == new Point(1140, 1332),
+            "The original layout's Saved Games button moved.");
+
+        foreach (var candidate in new[] { fullHd, quadHd, original, MenuLayout.Select(new Size(1440, 900)) })
+        {
+            var client = new Rectangle(Point.Empty, candidate.ClientSize);
+            for (int row = 0; row < VisibleSaveRows; row++)
+            {
+                int offset = candidate.RowOffset(row);
+                var play = candidate.PlayButtonPosition;
+                play.Offset(0, offset);
+                Require(client.Contains(candidate.ToClient(play)) &&
+                    client.Contains(candidate.CaptureRegion(candidate.SaveRow[1], offset)),
+                    "A Saved Games row extends outside the ACC client area.");
+            }
+        }
+    }
+
+    private static void VerifyMenuSignaturePadding()
+    {
+        const int padding = 4;
+        byte[] mask = {
+            2, 2, 2, 2, 2,
+            2, 1, 2, 1, 2,
+            2, 1, 1, 1, 2,
+            2, 1, 2, 1, 2,
+            2, 2, 2, 2, 2,
+        };
+        var label = new Signature(0, 0, 5, 5, Convert.ToBase64String(mask));
+        using (var frame = new Bitmap(label.Width + 2 * padding, label.Height + 2 * padding))
+        using (var graphics = Graphics.FromImage(frame))
+        {
+            graphics.Clear(Color.Black);
+            Require(!label.Matches(frame, 0.70, padding), "A blank menu region matched a label.");
+            graphics.Clear(Color.White);
+            Require(!label.Matches(frame, 0.70, padding), "A solid bright region matched a label.");
+            graphics.Clear(Color.Black);
+            for (int y = 0; y < label.Height; y++)
+            for (int x = 0; x < label.Width; x++)
+                if (mask[y * label.Width + x] == 1)
+                    frame.SetPixel(padding + x - 2, padding + y + 3, Color.White);
+            Require(label.Matches(frame, 0.70, padding), "A slightly shifted label was rejected.");
+        }
     }
 
     private static void VerifyLoopCountdown()

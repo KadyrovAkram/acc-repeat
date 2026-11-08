@@ -11,9 +11,10 @@ internal static partial class RepeatCorner
 {
     private const string GameProcess = "AC2-Win64-Shipping";
     private const int HotkeyMessage = 0x0312;
+    private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
     private static IntPtr game;
     private static Point origin;
-    private static int scale;
+    private static MenuLayout layout;
     private static bool diagnostics;
     private static string stage;
     private static bool reloadInProgress;
@@ -24,7 +25,7 @@ internal static partial class RepeatCorner
 
     private static int Main(string[] args)
     {
-        SetProcessDPIAware();
+        EnableDpiAwareness();
         if (args.Length == 1 && args[0] == "--check-screen")
             return CheckScreen();
         if (args.Length == 1 && args[0] == "--list-saves")
@@ -59,7 +60,7 @@ internal static partial class RepeatCorner
                 if (!startKey || !finishKey)
                     Console.WriteLine("One or more section hotkeys are already in use.");
                 Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
-                Console.WriteLine("Prototype layout: 2880 x 1800 or 1440 x 900, English menus.");
+                Console.WriteLine("English ACC menus: 1080p, 1440p, 1440 x 900, or 2880 x 1800.");
                 Console.WriteLine("Type 'help' for console commands.");
                 Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
                 StartConsoleInput();
@@ -90,6 +91,16 @@ internal static partial class RepeatCorner
         return 0;
     }
 
+    private static void EnableDpiAwareness()
+    {
+        try
+        {
+            if (SetProcessDpiAwarenessContext(PerMonitorAwareV2)) return;
+        }
+        catch (EntryPointNotFoundException) { }
+        SetProcessDPIAware();
+    }
+
     private static bool TryRetry(bool keyboard, Save expected = null)
     {
         if (!FindGame() || (expected != null && game != loopWindow)) return false;
@@ -99,6 +110,7 @@ internal static partial class RepeatCorner
         reloadInProgress = true;
         reloadTimeAway = 0;
         reloadFocusVersion = 0;
+        layout = null;
         try { Retry(keyboard, expected); }
         catch (Exception error)
         {
@@ -134,7 +146,7 @@ internal static partial class RepeatCorner
         int status = PracticeStatus();
         if (status != 2 && status != 3)
             throw new InvalidOperationException("Start in solo Free Practice, on the track.");
-        if (status == 2 && !Matches(PracticeMenu))
+        if (status == 2 && !Matches(layout.Pause))
         {
             stage = "opening the pause menu";
             EnsureGame();
@@ -146,29 +158,31 @@ internal static partial class RepeatCorner
             }
         }
 
-        WaitFor("Free Practice pause menu", PracticeMenu, 3);
+        WaitFor("Free Practice pause menu", layout.Pause, 3);
         stage = "selecting Quit";
-        Click(719, 641, PracticeMenu);
-        WaitFor("Quit confirmation", ConfirmQuit, 3);
+        Click(layout.QuitButton, layout.Pause);
+        WaitFor("Quit confirmation", layout.Confirm, 3);
         stage = "confirming Quit";
-        Click(597, 514, ConfirmQuit);
+        Click(layout.ConfirmButton, layout.Confirm);
         OpenSavedGames();
         stage = "selecting Play on the checkpoint row";
-        Click(1099, 237 + checkpoint.Row * 61, SavedGamesTitle, checkpoint: checkpoint);
-        WaitFor("restored checkpoint and Drive button", PracticeMenu, 90);
+        var play = layout.PlayButtonPosition;
+        play.Offset(0, layout.RowOffset(checkpoint.Row));
+        Click(play, layout.SavedTitle, checkpoint);
+        WaitFor("restored checkpoint and Drive button", layout.Pause, 90);
         stage = "selecting Drive";
-        Click(719, 366, PracticeMenu);
+        Click(layout.DriveButton, layout.Pause);
         int driveFocusVersion = reloadFocusVersion;
         double driveStarted = ReloadTime;
         while (true)
         {
-            bool paused = Matches(PracticeMenu);
+            bool paused = Matches(layout.Pause);
             if (!paused && PracticeStatus() == 2)
                 break;
             if (paused && driveFocusVersion != reloadFocusVersion)
             {
                 // ACC may have paused again after the original Drive click.
-                Click(719, 366, PracticeMenu);
+                Click(layout.DriveButton, layout.Pause);
                 driveFocusVersion = reloadFocusVersion;
                 driveStarted = ReloadTime;
             }
@@ -191,17 +205,17 @@ internal static partial class RepeatCorner
 
     private static void OpenSavedGames()
     {
-        WaitFor("main menu", HomeMenu, 45);
+        WaitFor("main menu", layout.Home, 45);
         for (int attempt = 1; attempt <= 3; attempt++)
         {
             stage = "opening Saved Games (attempt " + attempt + " of 3)";
-            Click(570, 666, HomeMenu);
-            if (WaitForMenu(SavedGamesTitle, 2)) return;
+            Click(layout.SavedGamesButton, layout.Home);
+            if (WaitForMenu(layout.SavedTitle, 2)) return;
 
             // Retry only if ACC still shows the main menu. A late transition may already be underway.
-            if (!Matches(HomeMenu))
+            if (!Matches(layout.Home))
             {
-                WaitFor("Saved Games after leaving the main menu", SavedGamesTitle, 6);
+                WaitFor("Saved Games after leaving the main menu", layout.SavedTitle, 6);
                 return;
             }
             if (attempt < 3)
@@ -235,16 +249,19 @@ internal static partial class RepeatCorner
         bool matched = true;
         foreach (var label in signatures)
         {
-            using (var capture = new Bitmap(label.Width * scale, label.Height * scale))
+            var region = layout.CaptureRegion(label, yOffset);
+            int padding = layout.SignaturePadding;
+            var referenceSize = new Size(label.Width + 2 * padding, label.Height + 2 * padding);
+            using (var capture = new Bitmap(region.Width, region.Height))
             using (var captureGraphics = Graphics.FromImage(capture))
-            using (var bitmap = new Bitmap(label.Width, label.Height))
+            using (var bitmap = new Bitmap(referenceSize.Width, referenceSize.Height))
             using (var graphics = Graphics.FromImage(bitmap))
             {
-                captureGraphics.CopyFromScreen(origin.X + label.X * scale, origin.Y + (label.Y + yOffset) * scale,
+                captureGraphics.CopyFromScreen(origin.X + region.X, origin.Y + region.Y,
                     0, 0, capture.Size);
                 graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
-                graphics.DrawImage(capture, new Rectangle(0, 0, label.Width, label.Height));
-                if (!label.Matches(bitmap, brightCoverage))
+                graphics.DrawImage(capture, new Rectangle(Point.Empty, referenceSize));
+                if (!label.Matches(bitmap, brightCoverage, padding))
                 {
                     if (!diagnostics) return false;
                     matched = false;
@@ -265,20 +282,44 @@ internal static partial class RepeatCorner
             mask = Convert.FromBase64String(encoded);
         }
 
-        public bool Matches(Bitmap bitmap, double brightCoverage)
+        public bool Matches(Bitmap bitmap, double brightCoverage, int padding)
         {
-            int foreground = 0, background = 0, foregroundMatches = 0, backgroundMatches = 0;
+            var brightPixels = new bool[bitmap.Width, bitmap.Height];
+            for (int y = 0; y < bitmap.Height; y++)
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                brightPixels[x, y] = pixel.R >= 120 && pixel.G >= 120 && pixel.B >= 120;
+            }
+            if (MatchesAt(brightPixels, brightCoverage, padding, padding, false))
+                return true;
+
+            // ACC can move individual labels slightly when changing the render resolution.
+            // Retain the dark outline and allow only a one-pixel change in the bright strokes.
+            for (int y = 1; y < 2 * padding; y++)
+            for (int x = 1; x < 2 * padding; x++)
+                if (MatchesAt(brightPixels, brightCoverage, x, y, true))
+                    return true;
+            return false;
+        }
+
+        private bool MatchesAt(bool[,] pixels, double brightCoverage, int left, int top, bool flexible)
+        {
+            int foreground = 0, background = 0, foregroundMatches = 0, nearbyMatches = 0, backgroundMatches = 0;
             for (int y = 0; y < Height; y++)
             for (int x = 0; x < Width; x++)
             {
                 byte expected = mask[y * Width + x];
                 if (expected == 0) continue;
-                var pixel = bitmap.GetPixel(x, y);
-                bool bright = pixel.R >= 120 && pixel.G >= 120 && pixel.B >= 120;
+                int column = left + x, row = top + y;
+                bool bright = pixels[column, row];
                 if (expected == 1)
                 {
                     foreground++;
                     if (bright) foregroundMatches++;
+                    if (flexible && (bright || pixels[column - 1, row] || pixels[column + 1, row] ||
+                        pixels[column, row - 1] || pixels[column, row + 1]))
+                        nearbyMatches++;
                 }
                 else
                 {
@@ -286,10 +327,12 @@ internal static partial class RepeatCorner
                     if (!bright) backgroundMatches++;
                 }
             }
-            if (diagnostics)
+            if (diagnostics && !flexible)
                 Console.WriteLine("{0},{1}: {2}/{3} bright, {4}/{5} background",
                     X, Y, foregroundMatches, foreground, backgroundMatches, background);
-            return foregroundMatches >= foreground * brightCoverage && backgroundMatches >= background * 0.78;
+            return backgroundMatches >= background * 0.78 &&
+                (foregroundMatches >= foreground * brightCoverage ||
+                 (flexible && foregroundMatches >= foreground * 0.55 && nearbyMatches >= foreground * 0.90));
         }
     }
 
@@ -298,15 +341,16 @@ internal static partial class RepeatCorner
         if (!FindGame()) return 1;
         diagnostics = true;
         EnsureGame();
-        Console.WriteLine("Origin " + origin + ", scale " + scale);
-        Console.WriteLine("Practice pause: " + Matches(PracticeMenu));
-        Console.WriteLine("Quit confirmation: " + Matches(ConfirmQuit));
-        Console.WriteLine("Main menu: " + Matches(HomeMenu));
-        Console.WriteLine("Saved Games: " + Matches(SavedGames));
-        if (Matches(SavedGamesTitle))
+        Console.WriteLine("Origin " + origin + ", ACC client size " + layout.ClientSize);
+        Console.WriteLine("Practice pause: " + Matches(layout.Pause));
+        Console.WriteLine("Quit confirmation: " + Matches(layout.Confirm));
+        Console.WriteLine("Main menu: " + Matches(layout.Home));
+        bool savedGames = Matches(layout.SavedTitle);
+        Console.WriteLine("Saved Games: " + savedGames);
+        if (savedGames)
         {
             for (int row = 0; row < VisibleSaveRows; row++)
-                Console.WriteLine("Practice Play row " + (row + 1) + ": " + MatchesSaveRow(row * 61));
+                Console.WriteLine("Practice Play row " + (row + 1) + ": " + MatchesSaveRow(row));
         }
         return 0;
     }
@@ -335,13 +379,20 @@ internal static partial class RepeatCorner
                 throw new InvalidOperationException("ACC lost focus. Switch back to ACC and retry.");
             WaitForReloadFocus();
         }
+        var size = ReadClientSize(out origin);
+        if (layout == null)
+            layout = MenuLayout.Select(size);
+        else if (layout.ClientSize != size)
+            throw new InvalidOperationException("The ACC window changed size. Retry from the practice session.");
+    }
+
+    private static Size ReadClientSize(out Point clientOrigin)
+    {
         Rect bounds;
-        origin = Point.Empty;
-        if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref origin) ||
-            (bounds.Right != 1440 && bounds.Right != 2880) || bounds.Bottom != bounds.Right / 8 * 5)
-            throw new InvalidOperationException("This prototype requires a 2880 x 1800 or 1440 x 900 ACC window. Detected " +
-                bounds.Right + " x " + bounds.Bottom + ".");
-        scale = bounds.Right / 1440;
+        clientOrigin = Point.Empty;
+        if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref clientOrigin))
+            throw new InvalidOperationException("Could not read the ACC window size and position.");
+        return new Size(bounds.Right, bounds.Bottom);
     }
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
@@ -351,30 +402,44 @@ internal static partial class RepeatCorner
         Console.WriteLine("Reload paused. Switch back to ACC to continue, or press F9 to cancel.");
         double awaySince = sectionClock.Elapsed.TotalSeconds;
         reloadFocusVersion++;
-        while (GetForegroundWindow() != game)
+        // Fullscreen ACC may briefly report a different client size while it restores the display mode.
+        double focusedSince = -1;
+        while (true)
         {
             if (IsDown(0x78)) throw new OperationCanceledException("Cancelled with F9.");
             if (!IsWindow(game)) throw new InvalidOperationException("ACC closed during the reload.");
+            if (GetForegroundWindow() == game)
+            {
+                double now = sectionClock.Elapsed.TotalSeconds;
+                if (focusedSince < 0) focusedSince = now;
+                Point clientOrigin;
+                bool restored = layout == null || ReadClientSize(out clientOrigin) == layout.ClientSize;
+                if (now - focusedSince >= 0.25 && (restored || now - focusedSince >= 2))
+                    break;
+            }
+            else
+                focusedSince = -1;
             Thread.Sleep(25);
         }
         reloadTimeAway += sectionClock.Elapsed.TotalSeconds - awaySince;
         Console.WriteLine("ACC focused. Checking the menu before continuing.");
     }
 
-    private static void Click(int x, int y, Signature[] expected, Save checkpoint = null)
+    private static void Click(Point button, Signature[] expected, Save checkpoint = null)
     {
         double started = ReloadTime;
         while (ReloadTime - started < 4)
         {
             EnsureGame();
             int focusVersion = reloadFocusVersion;
-            var point = new Point(origin.X + x * scale, origin.Y + y * scale);
+            var offset = layout.ToClient(button);
+            var point = Point.Add(origin, (Size)offset);
             if (Matches(expected) && GetForegroundWindow() == game &&
                 WindowFromPoint(point) == game && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
             {
                 // Hover reveals Play. Verify the same screen again before sending the click.
                 Thread.Sleep(65);
-                if (Matches(expected) && (checkpoint == null || MatchesSaveRow(checkpoint.Row * 61)))
+                if (Matches(expected) && (checkpoint == null || MatchesSaveRow(checkpoint.Row)))
                 {
                     EnsureGame();
                     if (checkpoint != null)
@@ -384,7 +449,8 @@ internal static partial class RepeatCorner
                             throw new InvalidOperationException("The save list changed during retry.");
                     }
                     Point cursor;
-                    if (focusVersion == reloadFocusVersion && GetForegroundWindow() == game &&
+                    if ((expected != layout.Pause || PracticeStatus() == 3) &&
+                        focusVersion == reloadFocusVersion && point == Point.Add(origin, (Size)offset) && GetForegroundWindow() == game &&
                         WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
                         cursor == point && !IsDown(0x01) && !IsDown(0x02))
                     {
@@ -398,10 +464,10 @@ internal static partial class RepeatCorner
         throw new InvalidOperationException("Could not confirm the expected ACC menu button.");
     }
 
-    private static bool MatchesSaveRow(int yOffset)
+    private static bool MatchesSaveRow(int row)
     {
         // Row spacing is fractional in ACC, so scaled text varies slightly by row.
-        return Matches(PracticePlayRow, yOffset, 0.62);
+        return Matches(layout.SaveRow, layout.RowOffset(row), 0.62);
     }
 
     private static void SendClick(Point point)
@@ -455,6 +521,7 @@ internal static partial class RepeatCorner
     }
 
     [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out Message message, IntPtr window, uint min, uint max, uint remove);
