@@ -68,6 +68,7 @@ internal static partial class RepeatCorner
             try
             {
                 LoadSettings();
+                PruneAllCuts();
                 if (desktop == null)
                 {
                     Console.Title = "ACC Repeat Corner";

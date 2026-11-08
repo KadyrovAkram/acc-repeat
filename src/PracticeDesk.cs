@@ -95,6 +95,7 @@ internal static partial class RepeatCorner
             clearWheel.Click += (sender, args) => session.Post(() => ConfigureWheel("clear"));
             findMarkers.Click += (sender, args) => session.Post(ToggleMarkerSearch);
             tuneMarkers.Click += OpenTuneDialog;
+            history.RemoveRequested += ConfirmRemove;
             refreshTimer.Tick += (sender, args) =>
             {
                 var view = session.Snapshot;
@@ -371,6 +372,16 @@ internal static partial class RepeatCorner
             row.Controls.Add(earlier, 2, 0);
             row.Controls.Add(later, 3, 0);
             return row;
+        }
+
+        private void ConfirmRemove(Attempt run)
+        {
+            bool isBest = displayed != null && displayed.Best != null && displayed.Best.Seconds == run.Seconds;
+            string question = string.Format("Remove the {0:0.000} s run from your history?{1}\n\nThis can't be undone.",
+                run.Seconds, isBest ? " It's your personal best; the quickest run left in the list becomes your best." : "");
+            if (MessageBox.Show(this, question, "Remove run", MessageBoxButtons.OKCancel, MessageBoxIcon.None,
+                MessageBoxDefaultButton.Button2) == DialogResult.OK)
+                session.Post(() => RemoveRun(run));
         }
 
         private void ToggleLoop(object sender, EventArgs args)
