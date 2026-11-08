@@ -1,0 +1,62 @@
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
+
+internal static partial class RepeatCorner
+{
+    private static readonly ConcurrentQueue<string> ConsoleCommands = new ConcurrentQueue<string>();
+
+    private static void StartConsoleInput()
+    {
+        var thread = new Thread(() =>
+        {
+            string line;
+            while ((line = Console.ReadLine()) != null)
+                ConsoleCommands.Enqueue(line);
+        });
+        thread.IsBackground = true;
+        thread.Start();
+    }
+
+    private static bool ProcessConsoleInput()
+    {
+        string line;
+        while (ConsoleCommands.TryDequeue(out line))
+        {
+            string[] parts = line.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
+            string args = parts.Length == 2 ? parts[1].Trim() : "";
+            string original = Json.Serialize(settings);
+            try
+            {
+                switch (parts[0].ToLowerInvariant())
+                {
+                    case "saves": PrintSaves(); break;
+                    case "pin": PinSave(args); break;
+                    case "use": UseCheckpoint(args); break;
+                    case "latest": UseLatest(); break;
+                    case "checkpoints": PrintCheckpoints(); break;
+                    case "quit": return false;
+                    case "help": PrintHelp(); break;
+                    default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
+                }
+            }
+            catch (Exception error)
+            {
+                settings = Json.Deserialize<ToolSettings>(original);
+                Console.WriteLine(error.Message);
+            }
+        }
+        return true;
+    }
+
+    private static void PrintHelp()
+    {
+        Console.WriteLine("saves                  List the ACC saves in menu order");
+        Console.WriteLine("pin <number> <name>    Name a save and make it the active checkpoint");
+        Console.WriteLine("checkpoints            List pins and show the active checkpoint");
+        Console.WriteLine("use <name>             Activate a named checkpoint");
+        Console.WriteLine("latest                 Switch back to the newest save");
+        Console.WriteLine("quit                   Close the tool");
+    }
+}

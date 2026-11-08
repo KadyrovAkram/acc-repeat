@@ -6,7 +6,6 @@ using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Web.Script.Serialization;
 
 internal static partial class RepeatCorner
 {
@@ -23,6 +22,11 @@ internal static partial class RepeatCorner
         SetProcessDPIAware();
         if (args.Length == 1 && args[0] == "--check-screen")
             return CheckScreen();
+        if (args.Length == 1 && args[0] == "--list-saves")
+        {
+            PrintSaves();
+            return 0;
+        }
 
         bool exists;
         using (var instance = new Mutex(true, @"Local\ACCRepeatCorner", out exists))
@@ -42,18 +46,19 @@ internal static partial class RepeatCorner
             try
             {
                 Console.Title = "ACC Repeat Corner";
-                Console.WriteLine("Ctrl+Shift+J: retry the newest Practice save while ACC is focused.");
+                LoadSettings();
+                Console.WriteLine("Ctrl+Shift+J: retry the selected Practice save while ACC is focused.");
                 Console.WriteLine("Hold F9 to cancel a retry. Close this window to stop the tool.");
                 Console.WriteLine("Prototype layout: 2880 x 1800 or 1440 x 900, English menus.");
+                Console.WriteLine("Type 'help' for console commands.");
+                Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
+                StartConsoleInput();
                 Message message;
-                while (GetMessage(out message, IntPtr.Zero, 0, 0) > 0)
+                while (ProcessConsoleInput())
                 {
-                    if (message.Id != HotkeyMessage || !FindGame())
-                        continue;
-
-                    try { Retry(); }
-                    catch (Exception error) { Console.WriteLine("Stopped while " + stage + ": " + error.Message); }
-                    while (PeekMessage(out message, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
+                    if (PeekMessage(out message, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1))
+                        TryRetry(true);
+                    Thread.Sleep(15);
                 }
             }
             finally { UnregisterHotKey(IntPtr.Zero, 1); }
@@ -61,11 +66,20 @@ internal static partial class RepeatCorner
         return 0;
     }
 
-    private static void Retry()
+    private static void TryRetry(bool keyboard)
+    {
+        if (!FindGame()) return;
+        try { Retry(keyboard); }
+        catch (Exception error) { Console.WriteLine("Stopped while " + stage + ": " + error.Message); }
+        Message pending;
+        while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
+    }
+
+    private static void Retry(bool keyboard)
     {
         var elapsed = Stopwatch.StartNew();
         stage = "waiting for the shortcut keys to be released";
-        while (IsDown(0x11) || IsDown(0x10) || IsDown(0x4A) || IsDown(0x5B) || IsDown(0x5C))
+        while (keyboard && (IsDown(0x11) || IsDown(0x10) || IsDown(0x4A) || IsDown(0x5B) || IsDown(0x5C)))
         {
             EnsureGame();
             if (elapsed.Elapsed.TotalSeconds > 2)
@@ -73,7 +87,7 @@ internal static partial class RepeatCorner
             Thread.Sleep(20);
         }
         stage = "checking the practice save";
-        var checkpoint = LatestPracticeSave();
+        var checkpoint = SelectSave();
         Console.WriteLine("Retrying " + checkpoint.Label + "...");
         int status = PracticeStatus();
         if (status != 2 && status != 3)
@@ -96,12 +110,13 @@ internal static partial class RepeatCorner
         WaitFor("main menu", HomeMenu, 45, HomeMenuHovered);
         stage = "opening Saved Games";
         Click(522, 638);
-        WaitFor("Saved Games and its first Practice row", SavedGames, 6);
-        var latest = LatestPracticeSave();
-        if (checkpoint.File != latest.File || checkpoint.Created != latest.Created)
-            throw new InvalidOperationException("The newest save changed during retry.");
-        stage = "selecting Play on the newest save";
-        Click(1099, 237, PlayButton);
+        WaitFor("Saved Games", SavedGamesTitle, 6);
+        var selected = SelectSave();
+        if (!checkpoint.SameSave(selected) || checkpoint.Row != selected.Row)
+            throw new InvalidOperationException("The save list changed during retry.");
+        int rowOffset = selected.Row * 61;
+        stage = "selecting Play on the checkpoint row";
+        Click(1099, 237 + rowOffset, PracticePlayRow, rowOffset);
         WaitFor("restored checkpoint and Drive button", PracticeMenu, 90);
         stage = "selecting Drive";
         Click(719, 366);
@@ -127,36 +142,6 @@ internal static partial class RepeatCorner
         }
     }
 
-    private sealed class Save
-    {
-        public string File, Created, Label, Mode;
-    }
-
-    private static Save LatestPracticeSave()
-    {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "Assetto Corsa Competizione", "Savegames");
-        if (!Directory.Exists(folder))
-            throw new InvalidOperationException("Create a Free Practice save in ACC first.");
-        var parser = new JavaScriptSerializer();
-        var latest = Directory.EnumerateFiles(folder, "*H.json")
-            .Where(path => Path.GetFileNameWithoutExtension(path).TrimEnd('H').All(char.IsDigit))
-            .Select(path =>
-            {
-                var data = parser.DeserializeObject(File.ReadAllText(path)) as System.Collections.Generic.Dictionary<string, object>;
-                if (data == null || !data.ContainsKey("creationDate") || !data.ContainsKey("gameMode"))
-                    throw new InvalidOperationException("Could not read an ACC save header.");
-                return new Save { File = path, Created = Convert.ToString(data["creationDate"]),
-                    Mode = Convert.ToString(data["gameMode"]),
-                    Label = Convert.ToString(data["trackDisplayName"]) + " (" + data["creationDate"] + ")" };
-            })
-            .OrderByDescending(save => save.Created, StringComparer.Ordinal)
-            .FirstOrDefault();
-        if (latest == null || latest.Mode != "Practice")
-            throw new InvalidOperationException("The newest saved game must be a Free Practice save.");
-        return latest;
-    }
-
     private static void WaitFor(string name, Signature[] signatures, int seconds, Signature[] alternative = null)
     {
         stage = "waiting for " + name;
@@ -169,7 +154,7 @@ internal static partial class RepeatCorner
         }
     }
 
-    private static bool Matches(Signature[] signatures)
+    private static bool Matches(Signature[] signatures, int yOffset = 0)
     {
         EnsureGame();
         bool matched = true;
@@ -180,7 +165,7 @@ internal static partial class RepeatCorner
             using (var bitmap = new Bitmap(label.Width, label.Height))
             using (var graphics = Graphics.FromImage(bitmap))
             {
-                captureGraphics.CopyFromScreen(origin.X + label.X * scale, origin.Y + label.Y * scale,
+                captureGraphics.CopyFromScreen(origin.X + label.X * scale, origin.Y + (label.Y + yOffset) * scale,
                     0, 0, capture.Size);
                 graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
                 graphics.DrawImage(capture, new Rectangle(0, 0, label.Width, label.Height));
@@ -277,7 +262,7 @@ internal static partial class RepeatCorner
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
 
-    private static void Click(int x, int y, Signature[] hoveredButton = null)
+    private static void Click(int x, int y, Signature[] hoveredButton = null, int yOffset = 0)
     {
         var watch = Stopwatch.StartNew();
         while (watch.Elapsed.TotalSeconds < 4)
@@ -290,7 +275,7 @@ internal static partial class RepeatCorner
             {
                 // Give ACC a frame to update hover, which reveals Play on the first row.
                 Thread.Sleep(65);
-                if (hoveredButton == null || Matches(hoveredButton))
+                if (hoveredButton == null || (Matches(SavedGamesTitle) && Matches(hoveredButton, yOffset)))
                 {
                     EnsureGame();
                     Point cursor;
@@ -360,7 +345,6 @@ internal static partial class RepeatCorner
     [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr window, int id);
-    [DllImport("user32.dll")] private static extern int GetMessage(out Message message, IntPtr window, uint min, uint max);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out Message message, IntPtr window, uint min, uint max, uint remove);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);

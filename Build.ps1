@@ -8,10 +8,10 @@ if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
 $bin = Join-Path $PSScriptRoot 'bin'
 New-Item -ItemType Directory -Path $bin -Force | Out-Null
 $exe = Join-Path $bin 'ACC Repeat Corner.exe'
-$source = Join-Path $PSScriptRoot 'src/RepeatCorner.cs'
-$masks = Join-Path $PSScriptRoot 'src/MenuSignatures.cs'
+$sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' -File |
+    ForEach-Object { $_.FullName })
 
-& $compiler /nologo /optimize+ /platform:x64 /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/out:$exe" $source $masks
+& $compiler /nologo /optimize+ /platform:x64 /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/out:$exe" @sources
 if ($LASTEXITCODE -ne 0) {
     throw "C# compiler exited with code $LASTEXITCODE."
 }
