@@ -8,6 +8,7 @@ internal static partial class RepeatCorner
     private static LoopCountdown countdown;
     private static IntPtr loopWindow;
     private static double nextLoopCheck;
+    private static double? telemetryMissingSince;
     private static SpeechSynthesizer loopVoice;
     private static Prompt resultAnnouncement;
     private static bool voiceUnavailable;
@@ -56,6 +57,7 @@ internal static partial class RepeatCorner
         resultAnnouncement = SpeakLoop(string.Format("{0:0.00} seconds.", attempt.Seconds));
         countdown = new LoopCountdown(sectionClock.Elapsed.TotalSeconds, loopDelay);
         nextLoopCheck = 0;
+        telemetryMissingSince = null;
     }
 
     private static void PollLoop()
@@ -70,20 +72,40 @@ internal static partial class RepeatCorner
         double now = sectionClock.Elapsed.TotalSeconds;
         if (GetForegroundWindow() != loopWindow)
         {
+            if (!IsWindow(loopWindow))
+            {
+                DisableLoop("ACC closed");
+                return;
+            }
+            telemetryMissingSince = null;
             SuspendLoop(now);
             return;
         }
 
         if (now < nextLoopCheck) return;
         nextLoopCheck = now + 0.05;
-        var frame = ReadTelemetry(countdown.IsSuspended);
-        if (frame == null || !SameTrack(frame.Track, loopSave.Track))
+        var frame = ReadTelemetry(true);
+        if (frame == null)
         {
-            DisableLoop("ACC left live solo Free Practice during the countdown");
+            // ACC can briefly drop its telemetry before Windows reports the new foreground window.
+            if (!telemetryMissingSince.HasValue) telemetryMissingSince = now;
+            if (now - telemetryMissingSince.Value >= 1 && GetForegroundWindow() == loopWindow)
+                DisableLoop("ACC left solo Free Practice during the countdown");
+            else
+                SuspendLoop(now);
             return;
         }
-        // ACC can pause itself when focus changes. Wait for live driving before resuming.
-        if (frame.Paused) return;
+        telemetryMissingSince = null;
+        if (!SameTrack(frame.Track, loopSave.Track))
+        {
+            DisableLoop("the current track differs from the selected save");
+            return;
+        }
+        if (frame.Paused)
+        {
+            SuspendLoop(now);
+            return;
+        }
         if (countdown.Resume(now))
             Console.WriteLine("Auto-retry countdown resumed.");
 

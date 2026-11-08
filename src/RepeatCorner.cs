@@ -16,6 +16,11 @@ internal static partial class RepeatCorner
     private static int scale;
     private static bool diagnostics;
     private static string stage;
+    private static bool reloadInProgress;
+    private static double reloadTimeAway;
+    private static int reloadFocusVersion;
+
+    private static double ReloadTime { get { return sectionClock.Elapsed.TotalSeconds - reloadTimeAway; } }
 
     private static int Main(string[] args)
     {
@@ -91,12 +96,16 @@ internal static partial class RepeatCorner
         if (expected != null) Console.WriteLine("Auto-retrying...");
         CancelLoopCountdown();
         timer.Reset();
+        reloadInProgress = true;
+        reloadTimeAway = 0;
+        reloadFocusVersion = 0;
         try { Retry(keyboard, expected); }
         catch (Exception error)
         {
             Console.WriteLine("Stopped while " + stage + ": " + error.Message);
             DisableLoop("retry stopped");
         }
+        finally { reloadInProgress = false; }
         wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
@@ -105,12 +114,12 @@ internal static partial class RepeatCorner
 
     private static void Retry(bool keyboard, Save expected)
     {
-        var elapsed = Stopwatch.StartNew();
+        double started = ReloadTime;
         stage = "waiting for the shortcut keys to be released";
         while (keyboard && (IsDown(0x11) || IsDown(0x10) || IsDown(0x4A) || IsDown(0x5B) || IsDown(0x5C)))
         {
             EnsureGame();
-            if (elapsed.Elapsed.TotalSeconds > 2)
+            if (ReloadTime - started > 2)
                 throw new InvalidOperationException("Release the shortcut keys promptly and try again.");
             Thread.Sleep(20);
         }
@@ -121,6 +130,7 @@ internal static partial class RepeatCorner
         if (loopSave != null && !loopSave.SameSave(checkpoint))
             DisableLoop("the selected save changed");
         Console.WriteLine("Retrying " + checkpoint.Label + "...");
+        EnsureGame();
         int status = PracticeStatus();
         if (status != 2 && status != 3)
             throw new InvalidOperationException("Start in solo Free Practice, on the track.");
@@ -128,40 +138,48 @@ internal static partial class RepeatCorner
         {
             stage = "opening the pause menu";
             EnsureGame();
-            Key(0x1B, 0);
-            Thread.Sleep(45);
-            Key(0x1B, 2);
+            if (PracticeStatus() == 2)
+            {
+                Key(0x1B, 0);
+                Thread.Sleep(45);
+                Key(0x1B, 2);
+            }
         }
 
         WaitFor("Free Practice pause menu", PracticeMenu, 3);
         stage = "selecting Quit";
-        Click(719, 641);
+        Click(719, 641, PracticeMenu);
         WaitFor("Quit confirmation", ConfirmQuit, 3);
         stage = "confirming Quit";
-        Click(597, 514);
+        Click(597, 514, ConfirmQuit);
         WaitFor("main menu", HomeMenu, 45, HomeMenuHovered);
         stage = "opening Saved Games";
-        Click(522, 638);
+        Click(522, 638, HomeMenu, HomeMenuHovered);
         WaitFor("Saved Games", SavedGamesTitle, 6);
-        var selected = SelectSave();
-        if (!checkpoint.SameSave(selected) || checkpoint.Row != selected.Row)
-            throw new InvalidOperationException("The save list changed during retry.");
-        int rowOffset = selected.Row * 61;
         stage = "selecting Play on the checkpoint row";
-        Click(1099, 237 + rowOffset, rowOffset);
+        Click(1099, 237 + checkpoint.Row * 61, SavedGamesTitle, checkpoint: checkpoint);
         WaitFor("restored checkpoint and Drive button", PracticeMenu, 90);
         stage = "selecting Drive";
-        Click(719, 366);
-        var watch = Stopwatch.StartNew();
+        Click(719, 366, PracticeMenu);
+        int driveFocusVersion = reloadFocusVersion;
+        double driveStarted = ReloadTime;
         while (true)
         {
-            if (!Matches(PracticeMenu) && PracticeStatus() == 2)
+            bool paused = Matches(PracticeMenu);
+            if (!paused && PracticeStatus() == 2)
                 break;
-            if (watch.Elapsed.TotalSeconds > 3)
+            if (paused && driveFocusVersion != reloadFocusVersion)
+            {
+                // ACC may have paused again after the original Drive click.
+                Click(719, 366, PracticeMenu);
+                driveFocusVersion = reloadFocusVersion;
+                driveStarted = ReloadTime;
+            }
+            if (ReloadTime - driveStarted > 3)
                 throw new InvalidOperationException("The Drive menu did not close.");
             Thread.Sleep(100);
         }
-        Console.WriteLine("Drive resumed after " + elapsed.Elapsed.TotalSeconds.ToString("0.0") + " seconds.");
+        Console.WriteLine("Drive resumed after " + (ReloadTime - started).ToString("0.0") + " seconds of reload time.");
     }
 
     private static int PracticeStatus()
@@ -177,13 +195,18 @@ internal static partial class RepeatCorner
     private static void WaitFor(string name, Signature[] signatures, int seconds, Signature[] alternative = null)
     {
         stage = "waiting for " + name;
-        var watch = Stopwatch.StartNew();
-        while (!Matches(signatures) && (alternative == null || !Matches(alternative)))
+        double started = ReloadTime;
+        while (!MatchesEither(signatures, alternative))
         {
-            if (watch.Elapsed.TotalSeconds >= seconds)
+            if (ReloadTime - started >= seconds)
                 throw new InvalidOperationException("Could not recognize " + name + ".");
             Thread.Sleep(125);
         }
+    }
+
+    private static bool MatchesEither(Signature[] expected, Signature[] alternative)
+    {
+        return Matches(expected) || (alternative != null && Matches(alternative));
     }
 
     private static bool Matches(Signature[] signatures, int yOffset = 0, double brightCoverage = 0.70)
@@ -287,7 +310,11 @@ internal static partial class RepeatCorner
         if (IsDown(0x78))
             throw new OperationCanceledException("Cancelled with F9.");
         if (GetForegroundWindow() != game)
-            throw new InvalidOperationException("ACC lost focus. Close any Windows menu, switch back to ACC, and retry.");
+        {
+            if (!reloadInProgress)
+                throw new InvalidOperationException("ACC lost focus. Switch back to ACC and retry.");
+            WaitForReloadFocus();
+        }
         Rect bounds;
         origin = Point.Empty;
         if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref origin) ||
@@ -299,24 +326,46 @@ internal static partial class RepeatCorner
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
 
-    private static void Click(int x, int y, int? saveRowOffset = null)
+    private static void WaitForReloadFocus()
     {
-        var watch = Stopwatch.StartNew();
-        while (watch.Elapsed.TotalSeconds < 4)
+        Console.WriteLine("Reload paused. Switch back to ACC to continue, or press F9 to cancel.");
+        double awaySince = sectionClock.Elapsed.TotalSeconds;
+        reloadFocusVersion++;
+        while (GetForegroundWindow() != game)
+        {
+            if (IsDown(0x78)) throw new OperationCanceledException("Cancelled with F9.");
+            if (!IsWindow(game)) throw new InvalidOperationException("ACC closed during the reload.");
+            Thread.Sleep(25);
+        }
+        reloadTimeAway += sectionClock.Elapsed.TotalSeconds - awaySince;
+        Console.WriteLine("ACC focused. Checking the menu before continuing.");
+    }
+
+    private static void Click(int x, int y, Signature[] expected, Signature[] alternative = null, Save checkpoint = null)
+    {
+        double started = ReloadTime;
+        while (ReloadTime - started < 4)
         {
             EnsureGame();
+            int focusVersion = reloadFocusVersion;
             var point = new Point(origin.X + x * scale, origin.Y + y * scale);
-            if (WindowFromPoint(point) != game)
-                throw new InvalidOperationException("The target point is covered by another window.");
-            if (!IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
+            if (MatchesEither(expected, alternative) && GetForegroundWindow() == game &&
+                WindowFromPoint(point) == game && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
             {
-                // Give ACC a frame to update hover, which reveals Play on the first row.
+                // Hover reveals Play. Verify the same screen again before sending the click.
                 Thread.Sleep(65);
-                if (!saveRowOffset.HasValue || (Matches(SavedGamesTitle) && MatchesSaveRow(saveRowOffset.Value)))
+                if (MatchesEither(expected, alternative) && (checkpoint == null || MatchesSaveRow(checkpoint.Row * 61)))
                 {
                     EnsureGame();
+                    if (checkpoint != null)
+                    {
+                        var selected = SelectSave();
+                        if (!checkpoint.SameSave(selected) || checkpoint.Row != selected.Row)
+                            throw new InvalidOperationException("The save list changed during retry.");
+                    }
                     Point cursor;
-                    if (WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
+                    if (focusVersion == reloadFocusVersion && GetForegroundWindow() == game &&
+                        WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
                         cursor == point && !IsDown(0x01) && !IsDown(0x02))
                     {
                         SendClick(point);
@@ -326,7 +375,7 @@ internal static partial class RepeatCorner
             }
             Thread.Sleep(125);
         }
-        throw new InvalidOperationException("Could not select the ACC button. Leave the mouse still briefly and try again.");
+        throw new InvalidOperationException("Could not confirm the expected ACC menu button.");
     }
 
     private static bool MatchesSaveRow(int yOffset)
@@ -390,6 +439,7 @@ internal static partial class RepeatCorner
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out Message message, IntPtr window, uint min, uint max, uint remove);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out Rect bounds);
     [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr window, ref Point point);
