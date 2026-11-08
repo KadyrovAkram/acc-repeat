@@ -33,3 +33,9 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 ## Compatibility
 
 The prototype uses the English menu layout from ACC 1.10.4. The executable accepts 2880 × 1800 and 1440 × 900 ACC windows. The full retry loop was verified at 2880 × 1800 in solo Free Practice.
+
+## Troubleshooting
+
+- Hold **F9** during a retry to cancel it. Close the console to stop the tool.
+- If the console says **ACC lost focus**, return to ACC. If the game is on the main menu, load the checkpoint manually to return to the track before trying the shortcut again.
+- If the tool stops while selecting a menu button, give it a moment to position the cursor during that step. The console reports the step where it stopped.
