@@ -22,6 +22,8 @@ internal static partial class RepeatCorner
         session.Join();
     }
 
+    private static string FormatSpeed(double speed) { return speed.ToString("0") + " km/h"; }
+
     private sealed class PracticeDesk : Form
     {
         private static readonly Color Background = Color.FromArgb(28, 29, 33);
@@ -384,8 +386,6 @@ internal static partial class RepeatCorner
         {
             return marker.HasValue ? marker.Value.ToString("0.00%") : "—";
         }
-
-        private static string FormatSpeed(double speed) { return speed.ToString("0") + " km/h"; }
 
         private static TableLayoutPanel Stack(int columns)
         {
