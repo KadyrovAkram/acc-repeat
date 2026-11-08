@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 
 internal static class PracticeDrillTests
 {
@@ -73,6 +75,10 @@ internal static partial class RepeatCorner
             "Driven distance was not summed across frames.");
 
         VerifyCutDetection();
+        VerifyTrackMap();
+        VerifyTrackMapImport();
+        VerifyBundledTrackMaps();
+        VerifyRunRemoval();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
         VerifyLoopCountdown();
@@ -214,6 +220,173 @@ internal static partial class RepeatCorner
         countdown = new LoopCountdown(10, 3);
         DisableLoop("test cancellation");
         Require(countdown == null && loopSave == null, "Stopping the loop left an automatic retry armed.");
+    }
+
+    private static void VerifyTrackMap()
+    {
+        const double radius = 900;
+        var map = new TrackMap { Track = "monza" };
+        for (int sample = 0; sample < 3 * MapBins; sample++)
+        {
+            double position = (sample + 0.5) / (3.0 * MapBins), angle = position * 2 * Math.PI;
+            map.Add(position, radius * Math.Cos(angle), radius * Math.Sin(angle));
+        }
+        var view = TrackMapView.From("monza", map);
+        Require(view.Coverage == 1, "A full lap did not complete the map.");
+
+        double gap;
+        var picked = view.Nearest(radius * Math.Cos(0.5 * Math.PI) * 1.02, radius * Math.Sin(0.5 * Math.PI) * 1.02, out gap);
+        Require(picked.HasValue && Math.Abs(picked.Value - 0.25) < 0.001 && Math.Abs(gap - radius * 0.02) < 1,
+            "A click beside the track did not snap to the nearest lap position.");
+        var point = view.PointAt(0.25).Value;
+        Require(Math.Abs(point.X) < 5 && Math.Abs(point.Y - radius) < 5, "A lap position was drawn in the wrong place.");
+        picked = view.Nearest(radius, -3, out gap);
+        Require(picked.HasValue && (picked.Value < 0.001 || picked.Value > 0.999), "Picking across the start line failed.");
+
+        var half = new TrackMap { Track = "monza" };
+        for (int sample = 0; sample < MapBins / 2; sample++)
+        {
+            double position = (sample + 0.5) / MapBins, angle = position * 2 * Math.PI;
+            half.Add(position, radius * Math.Cos(angle), radius * Math.Sin(angle));
+        }
+        view = TrackMapView.From("monza", half);
+        picked = view.Nearest(radius * Math.Cos(1.5 * Math.PI), radius * Math.Sin(1.5 * Math.PI), out gap);
+        Require(Math.Abs(view.Coverage - 0.5) < 0.000001 && picked.HasValue && picked.Value <= 0.5,
+            "A half-drawn map picked a point it hasn't recorded.");
+
+        var restored = Json.Deserialize<System.Collections.Generic.List<TrackMap>>(Json.Serialize(new[] { half }));
+        Require(restored.Count == 1 && restored[0].Filled.Count(filled => filled) == MapBins / 2 &&
+            restored[0].X[10] == half.X[10], "A track map failed to round-trip.");
+    }
+
+    private static void VerifyTrackMapImport()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "monza.bin");
+        try
+        {
+            using (var writer = new BinaryWriter(File.Create(path)))
+            {
+                writer.Write(new byte[] { 0x72, 0x65, 0x74, 0x6d });
+                writer.Write((ushort)1);
+                writer.Write(0L);
+                for (int sample = MapBins - 1; sample >= 0; sample--)
+                {
+                    float position = (sample + 0.25f) / MapBins;
+                    double angle = position * 2 * Math.PI;
+                    writer.Write((float)(900 * Math.Cos(angle)));
+                    writer.Write((float)(900 * Math.Sin(angle)));
+                    writer.Write(position);
+                }
+            }
+            var map = ReadTrackMapFile("monza", path);
+            var view = TrackMapView.From("monza", map);
+            Require(map.Imported && view.Coverage == 1, "A complete import did not fill the lap.");
+            foreach (double position in new[] { 0, 0.0405, 0.1807 })
+            {
+                var point = view.PointAt(position).Value;
+                double gap;
+                var picked = view.Nearest(point.X, point.Y, out gap);
+                Require(picked.HasValue && Math.Min(Math.Abs(position - picked.Value), 1 - Math.Abs(position - picked.Value)) < 0.00001,
+                    "An imported map point picked a different lap position.");
+            }
+
+            try
+            {
+                ReadTrackMapFile("spa", path);
+                throw new Exception("The import accepted another circuit's map.");
+            }
+            catch (InvalidDataException) { }
+
+            using (var stream = File.OpenWrite(path)) stream.SetLength(stream.Length - 12 * 50);
+            try
+            {
+                ReadTrackMapFile("monza", path);
+                throw new Exception("The import accepted a map with a large gap.");
+            }
+            catch (InvalidDataException) { }
+        }
+        finally
+        {
+            File.Delete(path);
+            Directory.Delete(directory);
+        }
+    }
+
+    private static void VerifyBundledTrackMaps()
+    {
+        var files = Directory.GetFiles(BundledMapsPath, "*.bin");
+        Require(files.Length == 25, "The build did not include all 25 track maps.");
+        foreach (string file in files)
+        {
+            string track = Path.GetFileNameWithoutExtension(file);
+            Require(MapView(track).Coverage == 1, "The bundled map did not load for " + track + ".");
+        }
+
+        var monza = MapView("monza");
+        foreach (double position in new[] { 0.0405, 0.1807 })
+        {
+            var point = monza.PointAt(position).Value;
+            double gap;
+            var picked = monza.Nearest(point.X, point.Y, out gap);
+            Require(picked.HasValue && Math.Abs(position - picked.Value) < 0.00001,
+                "The bundled Monza map moved a timing marker.");
+        }
+        Require(MapView("nurburgring").PointAt(0.5) != MapView("nurburgring_24h").PointAt(0.5),
+            "The Nürburgring layouts shared the same map.");
+        Require(MapView("unmapped_track").IsEmpty, "An unknown track loaded a different circuit's map.");
+
+        var recorded = new TrackMap { Track = "monza" };
+        var custom = new TrackMap { Track = "monza", Imported = true };
+        trackMaps.Add(recorded);
+        try
+        {
+            Require(FindTrackMap("monza") != recorded, "A partial recording hid the bundled map.");
+            trackMaps.Add(custom);
+            Require(FindTrackMap("monza") == custom, "A bundled map hid the user's imported map.");
+        }
+        finally
+        {
+            trackMaps.Remove(custom);
+            trackMaps.Remove(recorded);
+        }
+    }
+
+    private static void VerifyRunRemoval()
+    {
+        // Two cuts recorded first, while there was nothing to compare against.
+        var section = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
+        foreach (var run in new[]
+        {
+            new Attempt { Seconds = 28.9, Path = 811 }, new Attempt { Seconds = 28.7, Path = 812 },
+            new Attempt { Seconds = 29.1, Path = 810 }, new Attempt { Seconds = 27.4, Path = 789 },
+            new Attempt { Seconds = 27.6, Path = 791 }
+        })
+            RecordAttempt(section, run);
+        Require(section.BestAttempt.Seconds == 27.4, "Setup: the cut should be the recorded best.");
+        Require(PruneCuts(section) == 2 && section.RecentAttempts.Count == 3 && section.BestAttempt.Seconds == 28.7,
+            "Earlier cut runs were not removed once the usual line was known.");
+        Require(PruneCuts(section) == 0, "Clean runs were removed as cuts.");
+
+        // A best restored from the settings file is a separate object with the same values.
+        section.BestAttempt = Json.Deserialize<Attempt>(Json.Serialize(section.BestAttempt));
+        Require(DropAttempt(section, section.RecentAttempts.Find(run => run.Seconds == 28.7)) &&
+            section.BestAttempt.Seconds == 28.9 && section.RecentAttempts.Count == 2,
+            "Removing the personal best did not promote the next quickest run.");
+        Require(!DropAttempt(section, section.RecentAttempts.Find(run => run.Seconds == 29.1)) &&
+            section.BestAttempt.Seconds == 28.9, "Removing a slower run changed the personal best.");
+        try
+        {
+            DropAttempt(section, new Attempt { Seconds = 30 });
+            throw new Exception("Removing a run that isn't in the history was accepted.");
+        }
+        catch (InvalidOperationException) { }
+
+        var legacy = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
+        foreach (double seconds in new[] { 29.0, 27.0, 28.0, 28.5 }) RecordAttempt(legacy, new Attempt { Seconds = seconds });
+        Require(PruneCuts(legacy) == 0 && legacy.RecentAttempts.Count == 4,
+            "Runs without a measured distance were removed as cuts.");
     }
 
     private static void VerifyCutDetection()

@@ -34,6 +34,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "C# compiler exited with code $LASTEXITCODE."
 }
 
+$buildMaps = Join-Path $bin 'Maps'
+New-Item -ItemType Directory -Path $buildMaps -Force | Out-Null
+Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Maps') -File |
+    Copy-Item -Destination $buildMaps -Force
+
 if ($Test) {
     & $target
     if ($LASTEXITCODE -ne 0) { throw 'Practice drill checks failed.' }

@@ -68,6 +68,8 @@ internal static partial class RepeatCorner
             try
             {
                 LoadSettings();
+                LoadTrackMaps();
+                PruneAllCuts();
                 if (desktop == null)
                 {
                     Console.Title = "ACC Repeat Corner";
@@ -95,6 +97,7 @@ internal static partial class RepeatCorner
                             TryMarkSection(message.WParam.ToUInt64() == 2);
                     }
                     PollWheel();
+                    PollTrackMap();
                     PollSection();
                     PollLoop();
                     if (desktop != null) desktop.Publish();
@@ -103,6 +106,7 @@ internal static partial class RepeatCorner
             }
             finally
             {
+                SaveTrackMaps();
                 if (loopVoice != null) loopVoice.Dispose();
                 UnregisterHotKey(IntPtr.Zero, 1);
                 if (startKey) UnregisterHotKey(IntPtr.Zero, 2);

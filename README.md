@@ -6,6 +6,8 @@ Repeat a chosen stretch of track in Assetto Corsa Competizione without driving a
 
 ## Quick start
 
+Download the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat-corner/releases), extract it, and keep the `Maps` folder beside the executable.
+
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to your chosen section.
 3. A few seconds before the section begins, open the pause menu and select **Save**. Save while rolling so you have a run-up when you return.
@@ -33,7 +35,15 @@ Pins refer to ACC's original saves. Keep the chosen save among the first five ro
 2. With ACC focused, press **Ctrl+Shift+K** at the start of the stretch and **Ctrl+Shift+L** where you want the timer to stop. Set the finish less than half a lap ahead of the start. You can mark either point while paused on track.
 3. Retry and cross both marks in order. The Practice desk shows the section time, speeds at both marks, and saved marker positions.
 
-Markers belong to the active pin or, in latest-save mode, the current track. Marking a new start clears that drill's previous finish. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
+Markers belong to the active pin or, in latest-save mode, the current track, and are saved with it. You only need to place them once per checkpoint. Marking a new start clears that drill's previous finish.
+
+### Place markers on the track map
+
+Instead of pressing the shortcuts at the right moment, select **Place on map…** on the Practice desk. Choose **Start** or **Finish**, then click the track where you want that marker. The highlighted stretch between them is the timed section. Select **Save markers** to use them. Moving either marker starts a new run history.
+
+Repeat Corner includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
+
+Use **Import map…** to load a custom Race Element ACC `.bin` for the selected track, keeping its original filename. If you have no map for that track, you can draw one by driving a lap with ACC focused and Repeat Corner open. Imported and recorded maps are saved in `RepeatCorner.maps.json` beside the executable.
 
 ### Review your runs
 
@@ -47,7 +57,11 @@ History is stored with the timing markers in `RepeatCorner.settings.json`. Chang
 
 The tool measures how far the car actually drove between the markers. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut. The run isn't added to your history or personal best. The Practice desk says by how much it was short, the in-game overlay shows **Cut · not counted** with the run's time until your next run, and in a loop the voice says "Cut. Not counted." before retrying.
 
-ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first run on a new pair of markers has nothing to compare against, so it's always recorded.
+ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first runs on a new pair of markers have nothing to compare against, so they're always recorded. Once three runs have a measured distance, the tool applies the same check to the runs already in your history, including your personal best, and removes the cuts. It does this after each run and when it starts.
+
+### Remove a run
+
+To remove a run you don't want counted, hover over it in **Recent attempts** and select the **×** at the end of the row, then confirm. If your personal best has dropped out of the last five runs, it gets its own **Best** row so you can remove it too. When you remove your best, the quickest run left in the list becomes your best. Removing a run can't be undone. In the console version, use `history remove <1-5>` or `history remove best`.
 
 ### Run a hands-free loop
 

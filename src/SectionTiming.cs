@@ -63,6 +63,44 @@ internal static partial class RepeatCorner
         }
     }
 
+    // Sets both markers for the active drill without driving to them. Moving the start
+    // or the finish starts a new history, as it does when marking on track.
+    private static void ApplyMarkers(string track, double start, double finish, string message)
+    {
+        start = WrapPosition(start);
+        finish = WrapPosition(finish);
+        var pin = ActiveCheckpoint();
+        if (pin != null && !SameTrack(pin.Track, track))
+            throw new InvalidOperationException("Load the active checkpoint's track before setting the section.");
+        double span = SectionTimer.ForwardDistance(start, finish);
+        if (span < 0.0002 || span >= 0.5)
+            throw new InvalidOperationException("The finish must be ahead of the start and within half a lap.");
+
+        var section = CurrentSection(track);
+        if (section == null)
+        {
+            section = new Section { Checkpoint = settings.ActiveCheckpoint, Track = track, Start = start };
+            settings.Sections.Add(section);
+        }
+        else if (section.Start != start)
+        {
+            section.Start = start;
+            section.RecentAttempts.Clear();
+            section.BestAttempt = null;
+        }
+        SetFinish(section, finish);
+        StoreSettings();
+        timer.Reset();
+        DisableLoop("timing markers changed");
+        ReportStatus(message);
+    }
+
+    private static double WrapPosition(double position)
+    {
+        position %= 1;
+        return position < 0 ? position + 1 : position;
+    }
+
     private static bool SameTrack(string left, string right)
     {
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -138,8 +176,16 @@ internal static partial class RepeatCorner
                 if (trackName.Length == 0 || !(position >= 0 && position <= 1) ||
                     !(distance >= 0 && distance < double.PositiveInfinity) || !(speed >= 0 && speed < 500))
                     return null;
+                // The player's car in carCoordinates, matched by ID; x and z are the ground plane.
+                int active = Math.Min(60, Math.Max(0, graphics.ReadInt32(252)));
+                int player = graphics.ReadInt32(1216), slot = -1;
+                for (int car = 0; car < active && slot < 0; car++)
+                    if (graphics.ReadInt32(976 + car * 4) == player) slot = car;
                 return new TelemetryFrame
                 {
+                    HasCoordinates = slot >= 0,
+                    X = slot >= 0 ? graphics.ReadSingle(256 + slot * 12) : 0,
+                    Z = slot >= 0 ? graphics.ReadSingle(264 + slot * 12) : 0,
                     Track = trackName, Position = position, Distance = distance, Speed = speed,
                     Packet = graphics.ReadInt32(0), Time = sectionClock.Elapsed.TotalSeconds, Paused = status == 3
                 };
@@ -156,6 +202,8 @@ internal static partial class RepeatCorner
         public int Packet;
         public bool Paused;
         public double Position, Distance, Speed, Time;
+        public bool HasCoordinates;
+        public double X, Z;
     }
 
     private sealed class SectionTimer

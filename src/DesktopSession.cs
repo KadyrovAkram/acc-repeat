@@ -104,6 +104,8 @@ internal static partial class RepeatCorner
                 Wheel = settings.Wheel,
                 LearningWheel = learnWheel != null,
                 LoopArmed = loopSave != null,
+                Track = track,
+                Map = MapView(track),
                 CanArm = selected != null && section != null && section.Finish.HasValue,
                 Reloading = reloadInProgress,
                 OverlayPosition = OverlayPositions.Contains(settings.Overlay) ? settings.Overlay : DefaultOverlayPosition,
@@ -153,7 +155,8 @@ internal static partial class RepeatCorner
 
     private sealed class DeskSnapshot
     {
-        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition;
+        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition, Track;
+        public TrackMapView Map;
         public double? LiveStart;
         public int? Countdown;
         public Attempt LastCut;
