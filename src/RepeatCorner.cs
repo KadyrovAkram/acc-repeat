@@ -10,6 +10,7 @@ using System.Threading;
 internal static partial class RepeatCorner
 {
     private const string GameProcess = "AC2-Win64-Shipping";
+    private const string PlayCovered = "Another window is covering the checkpoint's Play button. Move it away and retry.";
     private const int HotkeyMessage = 0x0312;
     private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
     private static IntPtr game;
@@ -181,32 +182,9 @@ internal static partial class RepeatCorner
             DisableLoop("the selected save changed");
         Console.WriteLine("Retrying " + checkpoint.Label + "...");
         EnsureGame();
-        int status = PracticeStatus();
-        if (status != 2 && status != 3)
-            throw new InvalidOperationException("Start in solo Free Practice, on the track.");
-        if (status == 2 && !Matches(layout.Pause))
-        {
-            stage = "opening the pause menu";
-            EnsureGame();
-            if (PracticeStatus() == 2)
-            {
-                Key(0x1B, 0);
-                Thread.Sleep(45);
-                Key(0x1B, 2);
-            }
-        }
-
-        WaitFor("Free Practice pause menu", layout.Pause, 3);
-        stage = "selecting Quit";
-        Click(layout.QuitButton, layout.Pause);
-        WaitFor("Quit confirmation", layout.Confirm, 3);
-        stage = "confirming Quit";
-        Click(layout.ConfirmButton, layout.Confirm);
-        OpenSavedGames();
+        if (!Matches(layout.SavedTitle)) ExitPracticeForRetry(checkpoint);
         stage = "selecting Play on the checkpoint row";
-        var play = layout.PlayButtonPosition;
-        play.Offset(0, layout.RowOffset(checkpoint.Row));
-        Click(play, layout.SavedTitle, checkpoint);
+        Click(CheckpointPlayButton(checkpoint), layout.SavedTitle, checkpoint);
         WaitFor("restored checkpoint and Drive button", layout.Pause, 90);
         stage = "selecting Drive";
         Click(layout.DriveButton, layout.Pause);
@@ -229,6 +207,46 @@ internal static partial class RepeatCorner
             Thread.Sleep(100);
         }
         ReportStatus("Drive resumed after " + (ReloadTime - started).ToString("0.0") + " seconds of reload time.");
+    }
+
+    private static Point CheckpointPlayButton(Save checkpoint)
+    {
+        var point = layout.PlayButtonPosition;
+        point.Offset(0, layout.RowOffset(checkpoint.Row));
+        return point;
+    }
+
+    private static void ExitPracticeForRetry(Save checkpoint)
+    {
+        int status = PracticeStatus();
+        if (status != 2 && status != 3)
+            throw new InvalidOperationException("Start in solo Free Practice or on the Saved Games screen.");
+
+        stage = "checking the checkpoint's Play button";
+        EnsureGame();
+        var play = Point.Add(origin, (Size)layout.ToClient(CheckpointPlayButton(checkpoint)));
+        if (GetForegroundWindow() == game && WindowFromPoint(play) != game)
+            throw new InvalidOperationException(PlayCovered);
+
+        if (status == 2 && !Matches(layout.Pause))
+        {
+            stage = "opening the pause menu";
+            EnsureGame();
+            if (PracticeStatus() == 2)
+            {
+                Key(0x1B, 0);
+                Thread.Sleep(45);
+                Key(0x1B, 2);
+            }
+        }
+
+        WaitFor("Free Practice pause menu", layout.Pause, 3);
+        stage = "selecting Quit";
+        Click(layout.QuitButton, layout.Pause);
+        WaitFor("Quit confirmation", layout.Confirm, 3);
+        stage = "confirming Quit";
+        Click(layout.ConfirmButton, layout.Confirm);
+        OpenSavedGames();
     }
 
     private static int PracticeStatus()
@@ -478,14 +496,17 @@ internal static partial class RepeatCorner
     private static void Click(Point button, Signature[] expected, Save checkpoint = null)
     {
         double started = ReloadTime;
+        bool playCovered = false;
         while (ReloadTime - started < 4)
         {
             EnsureGame();
             int focusVersion = reloadFocusVersion;
             var offset = layout.ToClient(button);
             var point = Point.Add(origin, (Size)offset);
-            if (Matches(expected) && GetForegroundWindow() == game &&
-                WindowFromPoint(point) == game && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
+            bool expectedMenu = Matches(expected) && GetForegroundWindow() == game;
+            bool gameAtButton = expectedMenu && WindowFromPoint(point) == game;
+            playCovered = checkpoint != null && expectedMenu && !gameAtButton;
+            if (gameAtButton && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
             {
                 // Hover reveals Play. Verify the same screen again before sending the click.
                 Thread.Sleep(65);
@@ -512,7 +533,7 @@ internal static partial class RepeatCorner
             }
             Thread.Sleep(125);
         }
-        throw new InvalidOperationException("Could not confirm the expected ACC menu button.");
+        throw new InvalidOperationException(playCovered ? PlayCovered : "Could not confirm the expected ACC menu button.");
     }
 
     private static bool MatchesSaveRow(int row)
