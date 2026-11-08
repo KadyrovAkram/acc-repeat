@@ -9,8 +9,6 @@ using System.Web.Script.Serialization;
 internal static partial class RepeatCorner
 {
     private const int VisibleSaveRows = 5;
-    private static Signature[] SavedGamesTitle { get { return new[] { SavedGames[0] }; } }
-    private static Signature[] PracticePlayRow { get { return new[] { SavedGames[1], PlayButton[0] }; } }
     private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
     private static readonly string SettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RepeatCorner.settings.json");
     private static ToolSettings settings = new ToolSettings();
