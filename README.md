@@ -31,6 +31,12 @@ Pins refer to ACC's original saves. Keep the chosen save among the first five ro
 
 Markers belong to the active pin or, in latest-save mode, the current track. Marking a new start clears that drill's previous finish. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
 
+### Review your runs
+
+After each completed run, the console shows the difference from your previous personal best. A negative difference means you went quicker. Type `history` to see the personal best and the last five completed runs, newest first. The best stays saved even after it drops out of the recent list.
+
+History is stored with the timing markers in `RepeatCorner.settings.json`. Changing either marker starts a new history for that section.
+
 ## Screenshots
 
 Use **Save** in the Free Practice pause menu to create a checkpoint.
@@ -50,7 +56,7 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 & '.\bin\ACC Repeat Corner.exe'
 ```
 
-Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, and timing edge cases without opening ACC.
+Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, timing, and attempt history without opening ACC.
 
 ## Compatibility
 
