@@ -160,6 +160,9 @@ internal static partial class RepeatCorner
         private double? startTime;
         private double entrySpeed;
 
+        // When the car crossed the start of the attempt in progress, in sectionClock seconds.
+        public double? StartedAt { get { return startTime; } }
+
         public void Reset()
         {
             previous = null;
