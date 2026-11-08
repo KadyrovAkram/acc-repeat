@@ -67,21 +67,25 @@ internal static partial class RepeatCorner
             return;
         }
         if (countdown == null) return;
+        double now = sectionClock.Elapsed.TotalSeconds;
         if (GetForegroundWindow() != loopWindow)
         {
-            DisableLoop("ACC lost focus during the countdown");
+            SuspendLoop(now);
             return;
         }
 
-        double now = sectionClock.Elapsed.TotalSeconds;
         if (now < nextLoopCheck) return;
         nextLoopCheck = now + 0.05;
-        var frame = ReadTelemetry(false);
+        var frame = ReadTelemetry(countdown.IsSuspended);
         if (frame == null || !SameTrack(frame.Track, loopSave.Track))
         {
             DisableLoop("ACC left live solo Free Practice during the countdown");
             return;
         }
+        // ACC can pause itself when focus changes. Wait for live driving before resuming.
+        if (frame.Paused) return;
+        if (countdown.Resume(now))
+            Console.WriteLine("Auto-retry countdown resumed.");
 
         int? tick = countdown.Update(now, resultAnnouncement == null || resultAnnouncement.IsCompleted);
         if (!tick.HasValue) return;
@@ -90,16 +94,22 @@ internal static partial class RepeatCorner
         resultAnnouncement = null;
         if (tick.Value == 0)
         {
-            var expected = loopSave;
-            CancelLoopCountdown();
-            Console.WriteLine("Auto-retrying...");
-            TryRetry(false, expected);
+            if (!TryRetry(false, loopSave))
+                SuspendLoop(now);
         }
         else
         {
             Console.WriteLine("Auto-retry in {0} s. Tap F9 to cancel.", tick.Value);
             if (tick.Value <= 3) SpeakLoop(tick.Value.ToString());
         }
+    }
+
+    private static void SuspendLoop(double now)
+    {
+        if (!countdown.Suspend(now)) return;
+        resultAnnouncement = null;
+        CancelLoopSpeech();
+        Console.WriteLine("Auto-retry paused. Return to live driving in ACC to continue.");
     }
 
     private static void DisableLoop(string reason)
@@ -143,10 +153,13 @@ internal static partial class RepeatCorner
 
     private sealed class LoopCountdown
     {
-        private readonly double voiceDeadline;
+        private double voiceDeadline;
         private readonly int delay;
         private double? retryAt;
+        private double? suspendedAt;
         private int lastTick = -1;
+
+        public bool IsSuspended { get { return suspendedAt.HasValue; } }
 
         public LoopCountdown(double now, int delay)
         {
@@ -156,6 +169,7 @@ internal static partial class RepeatCorner
 
         public int? Update(double now, bool voiceFinished)
         {
+            if (IsSuspended) return null;
             if (!retryAt.HasValue)
             {
                 if (!voiceFinished && now < voiceDeadline) return null;
@@ -165,6 +179,24 @@ internal static partial class RepeatCorner
             if (tick == lastTick) return null;
             lastTick = tick;
             return tick;
+        }
+
+        public bool Suspend(double now)
+        {
+            if (IsSuspended) return false;
+            suspendedAt = now;
+            return true;
+        }
+
+        public bool Resume(double now)
+        {
+            if (!IsSuspended) return false;
+            double timeAway = now - suspendedAt.Value;
+            voiceDeadline += timeAway;
+            if (retryAt.HasValue) retryAt += timeAway;
+            suspendedAt = null;
+            lastTick = -1;
+            return true;
         }
     }
 }

@@ -77,6 +77,21 @@ internal static partial class RepeatCorner
         Require(!stalledVoice.Update(15.9, false).HasValue && stalledVoice.Update(16, false) == 2 &&
             stalledVoice.Update(18, false) == 0, "A stalled voice could block the countdown.");
 
+        var focusPause = new LoopCountdown(10, 3);
+        Require(focusPause.Update(10, true) == 3, "The initial countdown did not start.");
+        Require(focusPause.Suspend(11.5) && !focusPause.Suspend(15) &&
+            !focusPause.Update(25, true).HasValue, "Time away advanced or restarted the suspended countdown.");
+        Require(focusPause.Resume(25) && focusPause.Update(25, true) == 2 &&
+            focusPause.Update(25.75, true) == 1 && focusPause.Update(26.5, true) == 0,
+            "Returning to ACC did not preserve the remaining countdown.");
+
+        var calloutPause = new LoopCountdown(10, 3);
+        calloutPause.Suspend(10.5);
+        Require(!calloutPause.Update(100, true).HasValue, "A completed callout started a countdown while suspended.");
+        calloutPause.Resume(100);
+        Require(calloutPause.Update(100, true) == 3 && calloutPause.Update(103, true) == 0,
+            "Suspending during the callout shortened the countdown.");
+
         loopSave = new Save { Slot = "4", Created = "selected", Track = "monza" };
         countdown = new LoopCountdown(10, 3);
         CancelLoopCountdown();
