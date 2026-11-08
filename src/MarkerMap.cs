@@ -35,7 +35,7 @@ internal static partial class RepeatCorner
             canvas.Map = view.Map;
             ShowLoadPosition(view.LoadPosition);
 
-            Text = "Place markers · " + track;
+            Text = "Place markers · " + (view.TrackName ?? track);
             BackColor = Theme.Surface;
             ForeColor = Theme.Text;
             Font = font;

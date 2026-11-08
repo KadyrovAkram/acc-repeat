@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -231,7 +232,7 @@ internal static partial class RepeatCorner
             footer.Padding = new Padding(18, 6, 18, 0);
             var keys = new KeyHints(
                 new[] { "Ctrl+Shift+J", "Retry" }, new[] { "Ctrl+Shift+K", "Mark start" },
-                new[] { "Ctrl+Shift+L", "Mark finish" }, new[] { "F9", "Stop loop" })
+                new[] { "Ctrl+Shift+L", "Mark finish" }, new[] { "F9", "Disarm loop" })
             {
                 Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9)
             };
@@ -265,7 +266,7 @@ internal static partial class RepeatCorner
             using (var dialog = new Form
             {
                 Text = "Pin or rename a Free Practice checkpoint", BackColor = Theme.Surface, ForeColor = Theme.Text,
-                Font = Font, ClientSize = new Size(495, 205), FormBorderStyle = FormBorderStyle.FixedDialog,
+                Font = Font, ClientSize = new Size(495, 205), FormBorderStyle = FormBorderStyle.FixedSingle, Icon = Icon,
                 StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
                 ShowInTaskbar = false
             })
@@ -280,9 +281,20 @@ internal static partial class RepeatCorner
                 var name = new TextBox
                 {
                     Dock = DockStyle.Fill, AccessibleName = "Checkpoint name", MaxLength = 64,
-                    BackColor = Theme.Inset, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle,
-                    Margin = new Padding(0, 4, 6, 4)
+                    BackColor = Theme.Inset, ForeColor = Theme.Text, BorderStyle = BorderStyle.None
                 };
+                var nameField = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Inset, Margin = new Padding(0, 2, 6, 2), Padding = new Padding(10, 9, 10, 0) };
+                nameField.Controls.Add(name);
+                nameField.Click += (source, click) => name.Focus();
+                nameField.Paint += (source, paint) =>
+                {
+                    float fieldScale = Theme.Scale(paint.Graphics);
+                    paint.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    var edge = new RectangleF(0.5f, 0.5f, nameField.Width - 1.5f, nameField.Height - 1.5f);
+                    Theme.OutlineRounded(paint.Graphics, name.Focused ? Theme.Muted : Theme.Line, edge, 6 * fieldScale, 1.2f * fieldScale);
+                };
+                name.GotFocus += (source, focus) => nameField.Invalidate();
+                name.LostFocus += (source, focus) => nameField.Invalidate();
                 var accept = new PillButton("Save checkpoint") { Primary = true, Enabled = false };
                 accept.DialogResult = DialogResult.OK;
                 var cancel = new PillButton("Cancel");
@@ -291,7 +303,7 @@ internal static partial class RepeatCorner
                 AddRow(body, SectionHeading("Free Practice save"), 25);
                 AddRow(body, saves, 38);
                 AddRow(body, SectionHeading("Checkpoint name"), 30);
-                AddRow(body, name, 38);
+                AddRow(body, nameField, 38);
                 AddRow(body, TwoColumns(cancel, accept), 40);
                 dialog.Controls.Add(body);
                 dialog.AcceptButton = accept;
@@ -409,7 +421,7 @@ internal static partial class RepeatCorner
             if (last != null && last.PreviousBestDelta.HasValue)
             {
                 best.Text = string.Format("{0:+0.000;-0.000;0.000} s vs previous best   ·   {1}", last.PreviousBestDelta.Value, personalBest);
-                best.ForeColor = Theme.Green;
+                best.ForeColor = last.PreviousBestDelta.Value < 0 ? Theme.Green : Theme.Amber;
             }
             else if (last != null && view.Best != null && !IsBest(last, view.Best))
             {
