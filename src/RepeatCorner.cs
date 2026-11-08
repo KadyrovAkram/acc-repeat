@@ -42,12 +42,17 @@ internal static partial class RepeatCorner
                 Console.ReadLine();
                 return 1;
             }
+            bool startKey = RegisterHotKey(IntPtr.Zero, 2, 0x4006, 0x4B);
+            bool finishKey = RegisterHotKey(IntPtr.Zero, 3, 0x4006, 0x4C);
 
             try
             {
                 Console.Title = "ACC Repeat Corner";
                 LoadSettings();
                 Console.WriteLine("Ctrl+Shift+J: retry the selected Practice save while ACC is focused.");
+                Console.WriteLine("Ctrl+Shift+K / Ctrl+Shift+L: mark the section start / finish.");
+                if (!startKey || !finishKey)
+                    Console.WriteLine("One or more section hotkeys are already in use.");
                 Console.WriteLine("Hold F9 to cancel a retry. Close this window to stop the tool.");
                 Console.WriteLine("Prototype layout: 2880 x 1800 or 1440 x 900, English menus.");
                 Console.WriteLine("Type 'help' for console commands.");
@@ -57,12 +62,23 @@ internal static partial class RepeatCorner
                 while (ProcessConsoleInput())
                 {
                     if (PeekMessage(out message, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1))
-                        TryRetry(true);
+                    {
+                        if (message.WParam.ToUInt64() == 1)
+                            TryRetry(true);
+                        else
+                            TryMarkSection(message.WParam.ToUInt64() == 2);
+                    }
                     PollWheel();
+                    PollSection();
                     Thread.Sleep(15);
                 }
             }
-            finally { UnregisterHotKey(IntPtr.Zero, 1); }
+            finally
+            {
+                UnregisterHotKey(IntPtr.Zero, 1);
+                if (startKey) UnregisterHotKey(IntPtr.Zero, 2);
+                if (finishKey) UnregisterHotKey(IntPtr.Zero, 3);
+            }
         }
         return 0;
     }
@@ -70,6 +86,7 @@ internal static partial class RepeatCorner
     private static void TryRetry(bool keyboard)
     {
         if (!FindGame()) return;
+        timer.Reset();
         try { Retry(keyboard); }
         catch (Exception error) { Console.WriteLine("Stopped while " + stage + ": " + error.Message); }
         wheelArmed = false;

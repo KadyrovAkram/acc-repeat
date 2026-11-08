@@ -18,6 +18,7 @@ internal static partial class RepeatCorner
     public sealed class ToolSettings
     {
         public List<Checkpoint> Checkpoints = new List<Checkpoint>();
+        public List<Section> Sections = new List<Section>();
         public string ActiveCheckpoint;
         public WheelBinding Wheel;
     }
@@ -43,7 +44,7 @@ internal static partial class RepeatCorner
         settings = File.Exists(SettingsPath)
             ? Json.Deserialize<ToolSettings>(File.ReadAllText(SettingsPath))
             : new ToolSettings();
-        if (settings == null || settings.Checkpoints == null)
+        if (settings == null || settings.Checkpoints == null || settings.Sections == null)
             throw new InvalidOperationException("RepeatCorner.settings.json is invalid.");
     }
 
