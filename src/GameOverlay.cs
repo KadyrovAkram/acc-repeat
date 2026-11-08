@@ -39,7 +39,7 @@ internal static partial class RepeatCorner
     private sealed class GameOverlay : NativeWindow, IDisposable
     {
         private IntPtr lastForeground;
-        private bool foregroundIsGame, shown;
+        private bool foregroundIsGame;
         private string drawn;
 
         public GameOverlay()
@@ -85,22 +85,45 @@ internal static partial class RepeatCorner
             string key = string.Join("|", content) + "|" + position + "|" + size;
             if (key != drawn)
             {
-                Draw(content, position, size, scale);
+                if (!Draw(content, position, size, scale))
+                {
+                    Hide();
+                    return;
+                }
                 drawn = key;
             }
-            if (!shown)
+
+            if (overlaySuppressed || GetForegroundWindow() != lastForeground)
             {
-                ShowWindow(Handle, 4);
-                SetWindowPos(Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
-                shown = true;
+                Hide();
+                return;
             }
+
+            // ACC can promote its own topmost window after the overlay is already visible.
+            if (!IsWindowVisible(Handle) || GameIsAboveOverlay())
+            {
+                const uint NoSize = 0x0001, NoMove = 0x0002, NoActivate = 0x0010, Show = 0x0040;
+                SetWindowPos(Handle, new IntPtr(-1), 0, 0, 0, 0, NoSize | NoMove | NoActivate | Show);
+            }
+        }
+
+        private bool GameIsAboveOverlay()
+        {
+            const uint PreviousWindow = 3;
+            // Bound the walk in case another app is rearranging the desktop z-order.
+            var window = Handle;
+            for (int index = 0; index < 64; index++)
+            {
+                window = GetWindow(window, PreviousWindow);
+                if (window == IntPtr.Zero) return false;
+                if (window == lastForeground) return true;
+            }
+            return false;
         }
 
         private void Hide()
         {
-            if (!shown) return;
-            ShowWindow(Handle, 0);
-            shown = false;
+            if (IsWindowVisible(Handle)) ShowWindow(Handle, 0);
         }
 
         private bool GameInFront(out Rectangle client)
@@ -175,10 +198,10 @@ internal static partial class RepeatCorner
             return colour == "green" ? Theme.Green : colour == "amber" ? Theme.Amber : Theme.Red;
         }
 
-        private void Draw(string[] content, Point position, Size size, float scale)
+        private bool Draw(string[] content, Point position, Size size, float scale)
         {
             using (var bitmap = Paint(content, size, scale))
-                Push(bitmap, position);
+                return Push(bitmap, position);
         }
 
         internal static Bitmap Paint(string[] content, Size size, float scale)
@@ -230,7 +253,7 @@ internal static partial class RepeatCorner
             return bitmap;
         }
 
-        private void Push(Bitmap bitmap, Point position)
+        private bool Push(Bitmap bitmap, Point position)
         {
             IntPtr screen = GetDC(IntPtr.Zero);
             IntPtr memory = CreateCompatibleDC(screen);
@@ -241,7 +264,7 @@ internal static partial class RepeatCorner
                 var size = bitmap.Size;
                 var source = Point.Empty;
                 var blend = new BlendFunction { Op = 0, Flags = 0, Alpha = 255, Format = 1 };
-                UpdateLayeredWindow(Handle, screen, ref position, ref size, memory, ref source, 0, ref blend, 2);
+                return UpdateLayeredWindow(Handle, screen, ref position, ref size, memory, ref source, 0, ref blend, 2);
             }
             finally
             {
@@ -259,6 +282,8 @@ internal static partial class RepeatCorner
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
     [DllImport("user32.dll")] private static extern bool ShowWindowAsync(IntPtr window, int command);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint direction);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] private static extern bool SetWindowDisplayAffinity(IntPtr window, uint affinity);
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr window);
