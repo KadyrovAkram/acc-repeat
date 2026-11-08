@@ -23,6 +23,8 @@ The tool reads the first 32 buttons that the device exposes through the Windows 
 
 Select **Pin a save**, choose an ACC save, and give it a name such as **Monza T1**. Creating another ACC save leaves the pin on its original save. Use **Active checkpoint** to switch between your pins or return to **Latest save**.
 
+To rename a checkpoint, select **Pin a save**, choose the same ACC save, and enter the new name. The checkpoint keeps its timing markers, personal best, and recent runs.
+
 Pins refer to ACC's original saves. Keep the chosen save among the first five rows in **Saved Games**. If ACC deletes or overwrites it, select another pin or create a new one. The tool stores its settings beside the executable in `RepeatCorner.settings.json`.
 
 ## Time a section

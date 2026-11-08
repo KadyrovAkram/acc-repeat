@@ -257,7 +257,7 @@ internal static partial class RepeatCorner
             var available = displayed.AvailableSaves;
             using (var dialog = new Form
             {
-                Text = "Pin a Free Practice save", BackColor = Theme.Surface, ForeColor = Theme.Text,
+                Text = "Pin or rename a Free Practice checkpoint", BackColor = Theme.Surface, ForeColor = Theme.Text,
                 Font = Font, ClientSize = new Size(495, 205), FormBorderStyle = FormBorderStyle.FixedDialog,
                 StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
                 ShowInTaskbar = false
@@ -276,7 +276,7 @@ internal static partial class RepeatCorner
                     BackColor = Theme.Inset, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle,
                     Margin = new Padding(0, 4, 6, 4)
                 };
-                var accept = new PillButton("Pin checkpoint") { Primary = true, Enabled = false };
+                var accept = new PillButton("Save checkpoint") { Primary = true, Enabled = false };
                 accept.DialogResult = DialogResult.OK;
                 var cancel = new PillButton("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;

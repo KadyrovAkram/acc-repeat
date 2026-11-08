@@ -62,7 +62,7 @@ internal static partial class RepeatCorner
     private static void PrintHelp()
     {
         Console.WriteLine("saves                  List the ACC saves in menu order");
-        Console.WriteLine("pin <number> <name>    Name a save and make it the active checkpoint");
+        Console.WriteLine("pin <number> <name>    Name or rename a saved checkpoint and make it active");
         Console.WriteLine("checkpoints            List pins and show the active checkpoint");
         Console.WriteLine("use <name>             Activate a named checkpoint");
         Console.WriteLine("latest                 Switch back to the newest save");

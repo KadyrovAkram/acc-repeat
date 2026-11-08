@@ -60,9 +60,54 @@ internal static partial class RepeatCorner
             "An interrupted run counted after resuming mid-section.");
 
         VerifyAttemptHistory(result);
+        VerifyCheckpointRename();
         VerifyLoopCountdown();
         VerifyMenuLayouts();
         VerifyMenuSignaturePadding();
+    }
+
+    private static void VerifyCheckpointRename()
+    {
+        settings = new ToolSettings { ActiveCheckpoint = "Monza T1" };
+        var save = new Save { Slot = "4", Created = "old", Track = "monza", Mode = "Practice", Row = 1 };
+        var replacement = new Save { Slot = "4", Created = "new", Track = "monza", Mode = "Practice" };
+        var saves = new[] { replacement, save };
+        settings.Checkpoints.Add(new Checkpoint { Name = "Monza", Slot = "4", Created = "old", Track = "monza" });
+        settings.Checkpoints.Add(new Checkpoint { Name = "Monza T1", Slot = "4", Created = "old", Track = "monza" });
+        var section = new Section { Checkpoint = "Monza", Track = "monza", Start = 0.04, Finish = 0.18 };
+        var attempt = new Attempt { Seconds = 28.417 };
+        RecordAttempt(section, attempt);
+        settings.Sections.Add(section);
+
+        CollapseDuplicatePins();
+        Require(settings.Checkpoints.Count == 1 && ActiveCheckpoint().Name == "Monza T1" && CurrentSection("monza") == section,
+            "Consolidating old names lost the active pin or its timing section.");
+
+        SetCheckpointName(saves, save, "  First chicane  ");
+        Require(settings.Checkpoints.Count == 1 && FindCheckpoint("Monza T1") == null &&
+            ActiveCheckpoint().Name == "First chicane" && SelectSave(saves, ActiveCheckpoint()) == save &&
+            CurrentSection("monza") == section && section.Start == 0.04 && section.Finish == 0.18 &&
+            section.BestAttempt == attempt && section.RecentAttempts[0] == attempt,
+            "Renaming a pin created an alias or lost the checkpoint's timing data.");
+        SetCheckpointName(saves, save, "First Chicane");
+        Require(settings.Checkpoints.Count == 1 && CurrentSection("monza") == section && settings.ActiveCheckpoint == "First Chicane",
+            "A case-only rename did not update the active name and its timing section.");
+
+        SetCheckpointName(saves, replacement, "New save");
+        Require(settings.Checkpoints.Count == 2 && FindCheckpoint("First Chicane").Created == "old",
+            "Pinning a new save in the same slot renamed an existing checkpoint.");
+        try
+        {
+            SetCheckpointName(saves, replacement, "First Chicane");
+            throw new Exception("A rename was allowed to take another save's name.");
+        }
+        catch (InvalidOperationException) { }
+
+        settings.Checkpoints.Add(new Checkpoint { Name = "Separate drill", Slot = "4", Created = "old", Track = "monza" });
+        settings.Sections.Add(new Section { Checkpoint = "Separate drill", Track = "monza", Start = 0.21, Finish = 0.28 });
+        CollapseDuplicatePins();
+        Require(settings.Checkpoints.Count == 3 && settings.Sections.Count == 2,
+            "Consolidating old names removed a separate timing drill on the same save.");
     }
 
     private static void VerifyMenuLayouts()
