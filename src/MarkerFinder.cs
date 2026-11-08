@@ -65,6 +65,19 @@ internal static partial class RepeatCorner
             string.Format("{0} moved to {1:0.00%}.", start ? "Start" : "Finish", WrapPosition(moved)));
     }
 
+    private static void ConfigureMarkers(string arguments)
+    {
+        var parts = arguments.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        int steps;
+        if (parts.Length == 1 && parts[0].Equals("find", StringComparison.OrdinalIgnoreCase))
+            ToggleMarkerSearch();
+        else if (parts.Length == 2 && (parts[0] == "start" || parts[0] == "finish") &&
+            int.TryParse(parts[1], out steps) && steps != 0 && Math.Abs(steps) <= 100)
+            NudgeMarker(parts[0] == "start", steps);
+        else
+            throw new InvalidOperationException("Use 'markers find' or 'markers start|finish <steps>'.");
+    }
+
     private sealed class MarkerFinder
     {
         public const double BrakeOn = 0.3, FullThrottle = 0.95, LeadSeconds = 0.5, ExitHoldSeconds = 1.0,

@@ -40,6 +40,7 @@ internal static partial class RepeatCorner
                     case "section": PrintSections(); break;
                     case "history": PrintHistory(); break;
                     case "loop": ConfigureLoop(args); break;
+                    case "markers": ConfigureMarkers(args); break;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
                 }
@@ -74,6 +75,9 @@ internal static partial class RepeatCorner
         Console.WriteLine("loop on [seconds]      Enable auto-retry after a timed finish (default 3 seconds)");
         Console.WriteLine("loop off               Disable auto-retry");
         Console.WriteLine("loop                   Show the current loop status");
+        Console.WriteLine("markers find           Place both markers from your next run through the corner");
+        Console.WriteLine("markers start <steps>  Move the start by 0.1% of a lap per step (negative is earlier)");
+        Console.WriteLine("markers finish <steps> Move the finish by 0.1% of a lap per step");
         Console.WriteLine("quit                   Close the tool");
     }
 }
