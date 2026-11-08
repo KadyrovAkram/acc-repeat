@@ -97,11 +97,17 @@ internal static partial class RepeatCorner
         var frame = ReadTelemetry(false);
         var sectionOnTrack = frame == null ? null : CurrentSection(frame.Track);
         var result = timer.Observe(sectionOnTrack, frame);
-        if (result != null)
+        if (result == null) return;
+        double? cut = CutMetres(sectionOnTrack, result);
+        if (cut.HasValue)
         {
-            ReportAttempt(sectionOnTrack, result);
-            StartLoopCountdown(sectionOnTrack, result);
+            ReportStatus(string.Format("Run not counted: {0:0.00} s, but {1:0} m shorter than your usual line. " +
+                "Looks like a cut.", result.Seconds, cut.Value));
+            StartLoopCountdown(sectionOnTrack, "Cut. Not counted.");
+            return;
         }
+        ReportAttempt(sectionOnTrack, result);
+        StartLoopCountdown(sectionOnTrack, string.Format("{0:0.00} seconds.", result.Seconds));
     }
 
     private static MemoryMappedViewAccessor OpenPage(string name, int size)
@@ -159,6 +165,7 @@ internal static partial class RepeatCorner
         private TelemetryFrame previous;
         private double? startTime;
         private double entrySpeed;
+        private double path;
 
         // When the car crossed the start of the attempt in progress, in sectionClock seconds.
         public double? StartedAt { get { return startTime; } }
@@ -167,6 +174,7 @@ internal static partial class RepeatCorner
         {
             previous = null;
             startTime = null;
+            path = 0;
         }
 
         public static double ForwardDistance(double from, double to)
@@ -203,13 +211,24 @@ internal static partial class RepeatCorner
             double toStart = ForwardDistance(before.Position, active.Start);
             double toFinish = ForwardDistance(before.Position, active.Finish.Value);
             bool startCrossed = toStart > 0 && toStart <= progress;
+            // Distance actually driven in this frame, from speed. ACC's own distance and lap
+            // position follow the track, so they don't get shorter when the car cuts a corner.
+            double driven = (before.Speed + current.Speed) / 7.2 * seconds;
+            double drivenFrom = 0;
             if (startCrossed && (!startTime.HasValue || toStart <= toFinish))
             {
                 double fraction = toStart / progress;
                 startTime = before.Time + seconds * fraction;
                 entrySpeed = before.Speed + (current.Speed - before.Speed) * fraction;
+                path = 0;
+                drivenFrom = fraction;
             }
-            if (!startTime.HasValue || toFinish <= 0 || toFinish > progress) return null;
+            if (!startTime.HasValue) return null;
+            if (toFinish <= 0 || toFinish > progress)
+            {
+                path += driven * (1 - drivenFrom);
+                return null;
+            }
 
             double exitFraction = toFinish / progress;
             double duration = before.Time + seconds * exitFraction - startTime.Value;
@@ -218,7 +237,8 @@ internal static partial class RepeatCorner
             return new Attempt
             {
                 Seconds = duration, EntrySpeed = entrySpeed,
-                ExitSpeed = before.Speed + (current.Speed - before.Speed) * exitFraction
+                ExitSpeed = before.Speed + (current.Speed - before.Speed) * exitFraction,
+                Path = path + driven * (exitFraction - drivenFrom)
             };
         }
     }

@@ -43,6 +43,12 @@ Markers belong to the active pin or, in latest-save mode, the current track. Mar
 
 History is stored with the timing markers in `RepeatCorner.settings.json`. Changing either marker starts a new history for that section.
 
+### Cut runs aren't recorded
+
+The tool measures how far the car actually drove between the markers. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut. The run isn't added to your history or personal best. The Practice desk says by how much it was short, and in a loop the voice says "Cut. Not counted." before retrying.
+
+ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first run on a new pair of markers has nothing to compare against, so it's always recorded.
+
 ### Run a hands-free loop
 
 With both timing markers set, use **−** and **+** under **Countdown** to choose a delay from 1 to 30 seconds. The default is 3 seconds. Select **Arm loop**, return to ACC, and retry once to start from the selected checkpoint. After each timed finish, the tool reads out your time, shows the countdown, and reloads that checkpoint. The voice reads the final three seconds.
