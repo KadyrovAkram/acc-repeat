@@ -6,6 +6,8 @@ Practice the same corner or sector in Assetto Corsa Competizione without driving
 
 ## Quick start
 
+Download the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat-corner/releases), extract it, and keep the `Maps` folder beside the executable.
+
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to your chosen section.
 3. A few seconds before your braking point, open the pause menu and select **Save**. Save while rolling so you have a run-up when you return.
@@ -39,9 +41,9 @@ Markers belong to the active pin or, in latest-save mode, the current track, and
 
 Instead of pressing the shortcuts at the right moment, select **Place on map…** on the Practice desk. Choose **Start** or **Finish**, then click the track where you want that marker. The highlighted stretch between them is the timed section. Select **Save markers** to use them. Moving either marker starts a new run history.
 
-To use a map right away, download the matching `.bin` from the [Race Element ACC map files](https://github.com/RiddleTime/Race-Element/tree/dev/Race_Element.HUD.ACC/Overlays/Driving/TrackMap/Data/ACC) and keep its original filename, such as `monza.bin`. Open **Place on map… → Import map…** and choose the file. The import applies to the track of the selected checkpoint and keeps its timing markers and run history.
+Repeat Corner includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
 
-You can also draw a map by driving a lap with ACC focused and Repeat Corner open. While the map is incomplete, the dialog shows how much is recorded, and you can place markers on the parts you've driven. Maps are saved per track in `RepeatCorner.maps.json` beside the executable. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
+Use **Import map…** to load a custom Race Element ACC `.bin` for the selected track, keeping its original filename. If you have no map for that track, you can draw one by driving a lap with ACC focused and Repeat Corner open. Imported and recorded maps are saved in `RepeatCorner.maps.json` beside the executable.
 
 ### Review your runs
 
