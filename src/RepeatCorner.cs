@@ -11,6 +11,7 @@ internal static partial class RepeatCorner
 {
     private const string GameProcess = "AC2-Win64-Shipping";
     private const int HotkeyMessage = 0x0312;
+    private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
     private static IntPtr game;
     private static Point origin;
     private static MenuLayout layout;
@@ -24,7 +25,7 @@ internal static partial class RepeatCorner
 
     private static int Main(string[] args)
     {
-        SetProcessDPIAware();
+        EnableDpiAwareness();
         if (args.Length == 1 && args[0] == "--check-screen")
             return CheckScreen();
         if (args.Length == 1 && args[0] == "--list-saves")
@@ -88,6 +89,16 @@ internal static partial class RepeatCorner
             }
         }
         return 0;
+    }
+
+    private static void EnableDpiAwareness()
+    {
+        try
+        {
+            if (SetProcessDpiAwarenessContext(PerMonitorAwareV2)) return;
+        }
+        catch (EntryPointNotFoundException) { }
+        SetProcessDPIAware();
     }
 
     private static bool TryRetry(bool keyboard, Save expected = null)
@@ -368,15 +379,20 @@ internal static partial class RepeatCorner
                 throw new InvalidOperationException("ACC lost focus. Switch back to ACC and retry.");
             WaitForReloadFocus();
         }
-        Rect bounds;
-        origin = Point.Empty;
-        if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref origin))
-            throw new InvalidOperationException("Could not read the ACC window size and position.");
-        var size = new Size(bounds.Right, bounds.Bottom);
+        var size = ReadClientSize(out origin);
         if (layout == null)
             layout = MenuLayout.Select(size);
         else if (layout.ClientSize != size)
             throw new InvalidOperationException("The ACC window changed size. Retry from the practice session.");
+    }
+
+    private static Size ReadClientSize(out Point clientOrigin)
+    {
+        Rect bounds;
+        clientOrigin = Point.Empty;
+        if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref clientOrigin))
+            throw new InvalidOperationException("Could not read the ACC window size and position.");
+        return new Size(bounds.Right, bounds.Bottom);
     }
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
@@ -386,10 +402,23 @@ internal static partial class RepeatCorner
         Console.WriteLine("Reload paused. Switch back to ACC to continue, or press F9 to cancel.");
         double awaySince = sectionClock.Elapsed.TotalSeconds;
         reloadFocusVersion++;
-        while (GetForegroundWindow() != game)
+        // Fullscreen ACC may briefly report a different client size while it restores the display mode.
+        double focusedSince = -1;
+        while (true)
         {
             if (IsDown(0x78)) throw new OperationCanceledException("Cancelled with F9.");
             if (!IsWindow(game)) throw new InvalidOperationException("ACC closed during the reload.");
+            if (GetForegroundWindow() == game)
+            {
+                double now = sectionClock.Elapsed.TotalSeconds;
+                if (focusedSince < 0) focusedSince = now;
+                Point clientOrigin;
+                bool restored = layout == null || ReadClientSize(out clientOrigin) == layout.ClientSize;
+                if (now - focusedSince >= 0.25 && (restored || now - focusedSince >= 2))
+                    break;
+            }
+            else
+                focusedSince = -1;
             Thread.Sleep(25);
         }
         reloadTimeAway += sectionClock.Elapsed.TotalSeconds - awaySince;
@@ -492,6 +521,7 @@ internal static partial class RepeatCorner
     }
 
     [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out Message message, IntPtr window, uint min, uint max, uint remove);
