@@ -2,6 +2,8 @@
 
 Practice the same corner or sequence in Assetto Corsa Competizione without driving another full lap. Save a rolling approach in solo Free Practice, then use a shortcut to reload the checkpoint and resume driving.
 
+![The Practice desk showing a Monza checkpoint, loop controls, entry and exit speeds, and five example runs](docs/images/practice-desk.png)
+
 ## Quick start
 
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
