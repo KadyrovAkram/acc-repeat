@@ -1,6 +1,6 @@
 # ACC Repeat Corner
 
-Practice the same corner or sector in Assetto Corsa Competizione without driving another full lap. Save a rolling approach in solo Free Practice, then use a shortcut to reload the checkpoint and resume driving.
+Repeat a chosen stretch of track in Assetto Corsa Competizione without driving a full lap between attempts. Practice a braking zone, a sequence of corners, or a sector. Save your approach in solo Free Practice, then use a shortcut to reload the checkpoint and drive the section again.
 
 ![The Practice desk showing a Monza checkpoint, timing and loop controls, and five example runs with gap bars](docs/images/practice-desk.png)
 
@@ -8,7 +8,7 @@ Practice the same corner or sector in Assetto Corsa Competizione without driving
 
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to your chosen section.
-3. A few seconds before your braking point, open the pause menu and select **Save**. Save while rolling so you have a run-up when you return.
+3. A few seconds before the section begins, open the pause menu and select **Save**. Save while rolling so you have a run-up when you return.
 4. Drive the section. With ACC focused, press **Ctrl+Shift+J** to quit the current run, reload the selected save, and select **Drive**.
 
 By default, Retry uses the newest entry in **Saved Games**, which must be a Free Practice save. Save earlier on the approach if you need more room to settle the car after loading.
@@ -21,7 +21,7 @@ The tool reads the first 32 buttons that the device exposes through the Windows 
 
 ## Pin a checkpoint
 
-Select **Pin a save**, choose an ACC save, and give it a name such as **Monza T1**. Creating another ACC save leaves the pin on its original save. Use **Active checkpoint** to switch between your pins or return to **Latest save**.
+Select **Pin a save**, choose an ACC save, and give it a name such as **Monza Sector 1**. Creating another ACC save leaves the pin on its original save. Use **Active checkpoint** to switch between your pins or return to **Latest save**.
 
 To rename a checkpoint, select **Pin a save**, choose the same ACC save, and enter the new name. The checkpoint keeps its timing markers, personal best, and recent runs.
 
@@ -30,7 +30,7 @@ Pins refer to ACC's original saves. Keep the chosen save among the first five ro
 ## Time a section
 
 1. Save a rolling checkpoint **before** the place where you want timing to start. Select the pin first if you want the markers attached to it.
-2. With ACC focused, press **Ctrl+Shift+K** just before braking and **Ctrl+Shift+L** after the exit. You can mark a point while paused on track.
+2. With ACC focused, press **Ctrl+Shift+K** at the start of the stretch and **Ctrl+Shift+L** where you want the timer to stop. Set the finish less than half a lap ahead of the start. You can mark either point while paused on track.
 3. Retry and cross both marks in order. The Practice desk shows the section time, speeds at both marks, and saved marker positions.
 
 Markers belong to the active pin or, in latest-save mode, the current track. Marking a new start clears that drill's previous finish. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
