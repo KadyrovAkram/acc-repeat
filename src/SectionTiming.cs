@@ -179,6 +179,7 @@ internal static partial class RepeatCorner
                 return new TelemetryFrame
                 {
                     Track = trackName, Position = position, Distance = distance, Speed = speed,
+                    Gas = physics.ReadSingle(4), Brake = physics.ReadSingle(8),
                     Packet = graphics.ReadInt32(0), Time = sectionClock.Elapsed.TotalSeconds, Paused = status == 3
                 };
             }
@@ -194,6 +195,7 @@ internal static partial class RepeatCorner
         public int Packet;
         public bool Paused;
         public double Position, Distance, Speed, Time;
+        public double Gas, Brake;
     }
 
     private sealed class SectionTimer
