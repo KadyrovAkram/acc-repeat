@@ -135,7 +135,7 @@ internal static partial class RepeatCorner
             throw new InvalidOperationException("The save list changed during retry.");
         int rowOffset = selected.Row * 61;
         stage = "selecting Play on the checkpoint row";
-        Click(1099, 237 + rowOffset, PracticePlayRow, rowOffset);
+        Click(1099, 237 + rowOffset, rowOffset);
         WaitFor("restored checkpoint and Drive button", PracticeMenu, 90);
         stage = "selecting Drive";
         Click(719, 366);
@@ -173,7 +173,7 @@ internal static partial class RepeatCorner
         }
     }
 
-    private static bool Matches(Signature[] signatures, int yOffset = 0)
+    private static bool Matches(Signature[] signatures, int yOffset = 0, double brightCoverage = 0.70)
     {
         EnsureGame();
         bool matched = true;
@@ -188,7 +188,7 @@ internal static partial class RepeatCorner
                     0, 0, capture.Size);
                 graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
                 graphics.DrawImage(capture, new Rectangle(0, 0, label.Width, label.Height));
-                if (!label.Matches(bitmap))
+                if (!label.Matches(bitmap, brightCoverage))
                 {
                     if (!diagnostics) return false;
                     matched = false;
@@ -209,7 +209,7 @@ internal static partial class RepeatCorner
             mask = Convert.FromBase64String(encoded);
         }
 
-        public bool Matches(Bitmap bitmap)
+        public bool Matches(Bitmap bitmap, double brightCoverage)
         {
             int foreground = 0, background = 0, foregroundMatches = 0, backgroundMatches = 0;
             for (int y = 0; y < Height; y++)
@@ -233,7 +233,7 @@ internal static partial class RepeatCorner
             if (diagnostics)
                 Console.WriteLine("{0},{1}: {2}/{3} bright, {4}/{5} background",
                     X, Y, foregroundMatches, foreground, backgroundMatches, background);
-            return foregroundMatches >= foreground * 0.70 && backgroundMatches >= background * 0.78;
+            return foregroundMatches >= foreground * brightCoverage && backgroundMatches >= background * 0.78;
         }
     }
 
@@ -247,6 +247,11 @@ internal static partial class RepeatCorner
         Console.WriteLine("Quit confirmation: " + Matches(ConfirmQuit));
         Console.WriteLine("Main menu: " + Matches(HomeMenu));
         Console.WriteLine("Saved Games: " + Matches(SavedGames));
+        if (Matches(SavedGamesTitle))
+        {
+            for (int row = 0; row < VisibleSaveRows; row++)
+                Console.WriteLine("Practice Play row " + (row + 1) + ": " + MatchesSaveRow(row * 61));
+        }
         return 0;
     }
 
@@ -281,7 +286,7 @@ internal static partial class RepeatCorner
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
 
-    private static void Click(int x, int y, Signature[] hoveredButton = null, int yOffset = 0)
+    private static void Click(int x, int y, int? saveRowOffset = null)
     {
         var watch = Stopwatch.StartNew();
         while (watch.Elapsed.TotalSeconds < 4)
@@ -294,7 +299,7 @@ internal static partial class RepeatCorner
             {
                 // Give ACC a frame to update hover, which reveals Play on the first row.
                 Thread.Sleep(65);
-                if (hoveredButton == null || (Matches(SavedGamesTitle) && Matches(hoveredButton, yOffset)))
+                if (!saveRowOffset.HasValue || (Matches(SavedGamesTitle) && MatchesSaveRow(saveRowOffset.Value)))
                 {
                     EnsureGame();
                     Point cursor;
@@ -309,6 +314,12 @@ internal static partial class RepeatCorner
             Thread.Sleep(125);
         }
         throw new InvalidOperationException("Could not select the ACC button. Leave the mouse still briefly and try again.");
+    }
+
+    private static bool MatchesSaveRow(int yOffset)
+    {
+        // Row spacing is fractional in ACC, so scaled text varies slightly by row.
+        return Matches(PracticePlayRow, yOffset, 0.62);
     }
 
     private static void SendClick(Point point)
