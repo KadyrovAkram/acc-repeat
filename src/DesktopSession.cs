@@ -147,7 +147,9 @@ internal static partial class RepeatCorner
 
     private sealed class DeskSnapshot
     {
-        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error;
+        public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition;
+        public double? LiveStart;
+        public int? Countdown;
         public string[] PinNames;
         public Save[] AvailableSaves;
         public Attempt[] Recent;
