@@ -85,9 +85,10 @@ internal static partial class RepeatCorner
         return 0;
     }
 
-    private static void TryRetry(bool keyboard, Save expected = null)
+    private static bool TryRetry(bool keyboard, Save expected = null)
     {
-        if (!FindGame()) return;
+        if (!FindGame() || (expected != null && game != loopWindow)) return false;
+        if (expected != null) Console.WriteLine("Auto-retrying...");
         CancelLoopCountdown();
         timer.Reset();
         try { Retry(keyboard, expected); }
@@ -99,6 +100,7 @@ internal static partial class RepeatCorner
         wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
+        return true;
     }
 
     private static void Retry(bool keyboard, Save expected)
