@@ -2,7 +2,7 @@
 
 Practice the same corner or sector in Assetto Corsa Competizione without driving another full lap. Save a rolling approach in solo Free Practice, then use a shortcut to reload the checkpoint and resume driving.
 
-![The Practice desk showing a Monza checkpoint, loop controls, entry and exit speeds, and five example runs](docs/images/practice-desk.png)
+![The Practice desk showing a Monza checkpoint, timing and loop controls, and five example runs with gap bars](docs/images/practice-desk.png)
 
 ## Quick start
 
@@ -35,13 +35,15 @@ Markers belong to the active pin or, in latest-save mode, the current track. Mar
 
 ### Review your runs
 
-After each completed run, the Practice desk shows the difference from your previous personal best. A negative difference means you went quicker. The last five completed runs are listed newest first. The best stays saved even after it drops out of the recent list.
+**Last attempt** shows your section time and entry and exit speeds. New runs include the gap to your previous personal best. A negative gap means you went quicker. A positive gap means you were slower.
+
+**Recent attempts** lists your last five runs, newest first. The **VS BEST** column compares each run with your current personal best. A longer bar means a bigger gap, and the **PB** badge marks a run that matches your best. Your best stays saved after it drops out of the recent list.
 
 History is stored with the timing markers in `RepeatCorner.settings.json`. Changing either marker starts a new history for that section.
 
 ### Run a hands-free loop
 
-With both timing markers set, set the countdown, select **Arm loop**, and return to ACC. Retry once to start from the selected checkpoint. After each timed finish, the tool reads out your time, shows the countdown, and reloads that checkpoint. The countdown defaults to three seconds. The voice reads the final three seconds.
+With both timing markers set, use **−** and **+** under **Countdown** to choose a delay from 1 to 30 seconds. The default is 3 seconds. Select **Arm loop**, return to ACC, and retry once to start from the selected checkpoint. After each timed finish, the tool reads out your time, shows the countdown, and reloads that checkpoint. The voice reads the final three seconds.
 
 You can switch windows with Alt+Tab or your touchpad to check results. A pending countdown pauses while ACC is out of focus and resumes with the remaining time when you return to live driving. If ACC paused itself, select **Drive** to continue the countdown. A reload already in progress waits for ACC to regain focus, then checks the expected menu before continuing.
 
@@ -49,11 +51,11 @@ Press **F9** in ACC or select **Disarm loop** to turn the loop off. Press your w
 
 ## In-game overlay
 
-While ACC is focused, a small panel over the game shows the live section time, your last run with its gap to your personal best, and the loop countdown. Choose where it sits, or turn it off, under **In-game overlay** on the Practice desk.
+In windowed or borderless mode, the overlay shows your live section time between the timing markers. After the finish it shows your result and gap to your personal best. During an auto-retry countdown it also shows the seconds remaining.
 
 ![The overlay showing a 28.912 s run, +0.495 s off the personal best, with the auto-retry countdown](docs/images/overlay.png)
 
-The overlay ignores the mouse and never takes focus. It hides itself while a retry reloads the checkpoint, so it can't get in the way of the menu checks. Run ACC in borderless or windowed mode; exclusive full-screen mode draws over every other window.
+Use **In-game overlay** on the Practice desk to choose **Top centre**, **Top left**, **Top right**, **Bottom centre**, or **Off**. The default position is **Top centre**. The panel lets clicks pass through to ACC and hides during a retry and when ACC loses focus.
 
 ## Screenshots
 
