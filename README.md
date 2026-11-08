@@ -33,7 +33,13 @@ Pins refer to ACC's original saves. Keep the chosen save among the first five ro
 2. With ACC focused, press **Ctrl+Shift+K** just before braking and **Ctrl+Shift+L** after the exit. You can mark a point while paused on track.
 3. Retry and cross both marks in order. The Practice desk shows the section time, speeds at both marks, and saved marker positions.
 
-Markers belong to the active pin or, in latest-save mode, the current track. Marking a new start clears that drill's previous finish. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
+Markers belong to the active pin or, in latest-save mode, the current track, and are saved with it. You only need to place them once per checkpoint. Marking a new start clears that drill's previous finish.
+
+### Let the tool find the markers
+
+Instead of pressing the shortcuts at the right moment, select **Find markers** on the Practice desk, then retry from your checkpoint and drive the corner as usual. The tool watches your pedals. It places the start half a second before you brake and the finish once you've been flat out for a second on the exit. The in-game overlay shows **Finding markers** until it's done. If you retry during the search, it starts again from the checkpoint. Select **Cancel search** to stop.
+
+To move a marker without driving, select **Fine-tune…** and use **−** and **+**. Each step moves the marker 0.1% of a lap (about 6 m at Monza). Moving either marker starts a new run history. In the console version, use `markers find`, `markers start <steps>` and `markers finish <steps>`. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
 
 ### Review your runs
 
