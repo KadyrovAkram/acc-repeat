@@ -37,6 +37,12 @@ After each completed run, the console shows the difference from your previous pe
 
 History is stored with the timing markers in `RepeatCorner.settings.json`. Changing either marker starts a new history for that section.
 
+### Run a hands-free loop
+
+With both timing markers set, type `loop on` in the console and return to ACC. Retry once to start from the selected checkpoint. After each timed finish, the tool reads out your time, gives a three-second countdown, and reloads that checkpoint. Use `loop on 5` for a five-second countdown. The console shows the countdown, and the voice reads the final three seconds.
+
+Tap **F9** in ACC or type `loop off` to turn the loop off. Press your wheel button or **Ctrl+Shift+J** to retry early and keep looping. The loop starts off each time you launch the tool. Switching checkpoints, changing the markers, or leaving live practice during a countdown turns it off.
+
 ## Screenshots
 
 Use **Save** in the Free Practice pause menu to create a checkpoint.
@@ -56,7 +62,7 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 & '.\bin\ACC Repeat Corner.exe'
 ```
 
-Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, timing, and attempt history without opening ACC.
+Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, timing, attempt history, and the loop countdown without opening ACC.
 
 ## Compatibility
 
