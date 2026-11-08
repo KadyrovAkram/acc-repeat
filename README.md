@@ -65,6 +65,8 @@ In windowed or borderless mode, the overlay shows your live section time between
 
 Use **In-game overlay** on the Practice desk to choose **Top centre**, **Top left**, **Top right**, **Bottom centre**, or **Off**. The default position is **Top centre**. The panel lets clicks pass through to ACC and hides during a retry and when ACC loses focus.
 
+If the panel is missing in fullscreen, open **Options → Video** in ACC, set **Fullscreen** to **Disabled**, and select **Apply**. Choose a supported resolution that fits on your desktop if needed. **Alt+Enter** can also switch ACC to windowed mode for a quick check.
+
 ## Screenshots
 
 Use **Save** in the Free Practice pause menu to create a checkpoint.
