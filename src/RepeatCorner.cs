@@ -420,7 +420,8 @@ internal static partial class RepeatCorner
                             throw new InvalidOperationException("The save list changed during retry.");
                     }
                     Point cursor;
-                    if (focusVersion == reloadFocusVersion && point == Point.Add(origin, (Size)offset) && GetForegroundWindow() == game &&
+                    if ((expected != layout.Pause || PracticeStatus() == 3) &&
+                        focusVersion == reloadFocusVersion && point == Point.Add(origin, (Size)offset) && GetForegroundWindow() == game &&
                         WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
                         cursor == point && !IsDown(0x01) && !IsDown(0x02))
                     {
