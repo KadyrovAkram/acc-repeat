@@ -6,7 +6,7 @@ Repeat a chosen stretch of track in Assetto Corsa Competizione without driving a
 
 ## Quick start
 
-Download the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat-corner/releases), extract it, and keep the `Maps` folder beside the executable.
+For the latest Practice desk, map zoom, and checkpoint load marker, [build the Windows app from `main`](#build-on-windows). For a ready-to-run download, get the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat-corner/releases), extract it, and keep the `Maps` folder beside the executable. The current ZIP is **v0.1.0** and has its own [release instructions](https://github.com/KadyrovAkram/acc-repeat-corner/blob/v0.1.0/README.md).
 
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to your chosen section.
@@ -45,7 +45,9 @@ Instead of pressing the shortcuts at the right moment, select **Place on map…*
 
 Scroll over a corner to zoom toward it, or use **+** and **−**. While zoomed in, drag with the right mouse button to move around. **Fit** shows the whole circuit again.
 
-The amber **Load** diamond shows where your selected checkpoint places the car on the circuit.
+The amber **Load** diamond shows where your selected checkpoint places the car on the circuit. Its percentage is the saved position along the lap. Place the timing start far enough ahead to give yourself a run-up after loading.
+
+![The Monza track map with zoom controls, an amber Load diamond, and a highlighted section between the start and finish markers](docs/images/track-map.png)
 
 Repeat Corner includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
 
@@ -53,7 +55,7 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 ### Review your runs
 
-**Last attempt** shows your section time and entry and exit speeds. New runs include the gap to your previous personal best. A negative gap means you went quicker. A positive gap means you were slower.
+**Last attempt** shows your section time and entry and exit speeds. The gap to your previous personal best is green when you go quicker and amber when you go slower.
 
 **Recent attempts** lists your last five runs, newest first. The **VS BEST** column compares each run with your current personal best. A longer bar means a bigger gap, and the **PB** badge marks a run that matches your best. Your best stays saved after it drops out of the recent list.
 
@@ -79,11 +81,11 @@ Press **F9** in ACC or select **Disarm loop** to turn the loop off. Press your w
 
 ## In-game overlay
 
-In windowed or borderless mode, the overlay shows your live section time between the timing markers. After the finish it shows your result and gap to your personal best. During an auto-retry countdown it also shows the seconds remaining.
+During Free Practice in windowed or borderless mode, the overlay shows your live section time between the timing markers. After the finish it shows your result and gap to your personal best. During an auto-retry countdown it also shows the seconds remaining.
 
 ![The overlay showing a 28.912 s run, +0.495 s off the personal best, with the auto-retry countdown](docs/images/overlay.png)
 
-Use **In-game overlay** on the Practice desk to choose **Top centre**, **Top left**, **Top right**, **Bottom centre**, or **Off**. The default position is **Top centre**. The panel lets clicks pass through to ACC and hides during a retry and when ACC loses focus.
+Use **In-game overlay** on the Practice desk to choose **Top centre**, **Top left**, **Top right**, **Bottom centre**, or **Off**. The default position is **Top centre**. The panel lets clicks pass through to ACC and hides on the main menu, during a retry, and when ACC loses focus.
 
 If the panel is missing in fullscreen, open **Options → Video** in ACC, set **Fullscreen** to **Disabled**, and select **Apply**. Choose a supported resolution that fits on your desktop if needed. **Alt+Enter** can also switch ACC to windowed mode for a quick check.
 
