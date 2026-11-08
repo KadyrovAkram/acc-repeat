@@ -104,6 +104,7 @@ internal static partial class RepeatCorner
             snapshot = new DeskSnapshot
             {
                 Connected = connected,
+                InPracticeSession = connected && !reloadInProgress && settings.Overlay != "Off" && IsPracticeSessionActive(),
                 PinNames = settings.Checkpoints.Select(pin => pin.Name).ToArray(),
                 ActivePin = settings.ActiveCheckpoint,
                 AvailableSaves = saves.Where(save => save.Row < VisibleSaveRows && save.Mode == "Practice").ToArray(),
@@ -179,6 +180,6 @@ internal static partial class RepeatCorner
         public Attempt Best;
         public WheelBinding Wheel;
         public double? Start, Finish, LoadPosition;
-        public bool Connected, LearningWheel, LoopArmed, CanArm, Reloading;
+        public bool Connected, InPracticeSession, LearningWheel, LoopArmed, CanArm, Reloading;
     }
 }
