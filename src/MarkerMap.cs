@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-// Place the timing markers by clicking on the recorded track map.
+// Place the timing markers by clicking on the track map.
 internal static partial class RepeatCorner
 {
     private sealed class MarkerMapDialog : Form
@@ -12,6 +13,7 @@ internal static partial class RepeatCorner
         private readonly DesktopSession session;
         private readonly string track;
         private readonly MapCanvas canvas = new MapCanvas { Dock = DockStyle.Fill };
+        private readonly PillButton importMap = new PillButton("Import map…");
         private readonly PillButton placeStart = new PillButton("Start");
         private readonly PillButton placeFinish = new PillButton("Finish");
         private readonly PillButton save = new PillButton("Save markers") { Primary = true };
@@ -45,8 +47,9 @@ internal static partial class RepeatCorner
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
 
-            var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Margin = Padding.Empty };
+            var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, Margin = Padding.Empty };
             top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 122));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
@@ -55,9 +58,10 @@ internal static partial class RepeatCorner
                 Text = "Click the track to place the", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight,
                 ForeColor = Theme.Muted, Margin = new Padding(0, 0, 8, 0), UseMnemonic = false
             };
-            top.Controls.Add(prompt, 0, 0);
-            top.Controls.Add(placeStart, 1, 0);
-            top.Controls.Add(placeFinish, 2, 0);
+            top.Controls.Add(importMap, 0, 0);
+            top.Controls.Add(prompt, 1, 0);
+            top.Controls.Add(placeStart, 2, 0);
+            top.Controls.Add(placeFinish, 3, 0);
 
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Margin = Padding.Empty };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -80,6 +84,7 @@ internal static partial class RepeatCorner
 
             placeStart.Click += (sender, args) => SetMode(true);
             placeFinish.Click += (sender, args) => SetMode(false);
+            importMap.Click += ImportMap;
             canvas.Picked += Place;
             save.Click += Save;
             refresh.Tick += (sender, args) =>
@@ -99,6 +104,51 @@ internal static partial class RepeatCorner
         {
             if (disposing) refresh.Dispose();
             base.Dispose(disposing);
+        }
+
+        private async void ImportMap(object sender, EventArgs args)
+        {
+            string path;
+            using (var picker = new OpenFileDialog
+            {
+                Title = "Import " + track + ".bin",
+                Filter = "Race Element ACC maps (*.bin)|*.bin",
+                FileName = track + ".bin",
+                RestoreDirectory = true
+            })
+            {
+                if (picker.ShowDialog(this) != DialogResult.OK) return;
+                path = picker.FileName;
+            }
+
+            importMap.Enabled = false;
+            var pending = new TaskCompletionSource<TrackMapView>();
+            session.Post(() =>
+            {
+                try
+                {
+                    var map = ImportTrackMap(track, path);
+                    ReportStatus("Imported the track map for " + track + ".");
+                    pending.SetResult(map);
+                }
+                catch (Exception error) { pending.SetException(error); }
+            });
+            try
+            {
+                var map = await pending.Task;
+                if (IsDisposed) return;
+                canvas.Map = map;
+                canvas.Invalidate();
+            }
+            catch (Exception error)
+            {
+                if (!IsDisposed)
+                    MessageBox.Show(this, error.Message, "Could not import track map", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                if (!IsDisposed) importMap.Enabled = true;
+            }
         }
 
         private void SetMode(bool start)
@@ -244,7 +294,7 @@ internal static partial class RepeatCorner
             if (!Fit(36 * dpi))
             {
                 string message = "No map of " + (Map == null ? "this track" : Map.Track) + " yet.\n\n" +
-                    "Drive a lap with Repeat Corner open and the track will draw itself here.";
+                    "Import a map file or drive a lap with Repeat Corner open.";
                 TextRenderer.DrawText(graphics, message, Font, ClientRectangle, Theme.Muted,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
                 return;
