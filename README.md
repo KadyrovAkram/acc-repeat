@@ -39,7 +39,9 @@ Markers belong to the active pin or, in latest-save mode, the current track, and
 
 Instead of pressing the shortcuts at the right moment, select **Place on map…** on the Practice desk. Choose **Start** or **Finish**, then click the track where you want that marker. The highlighted stretch between them is the timed section. Select **Save markers** to use them. Moving either marker starts a new run history.
 
-ACC doesn't provide track outlines, so the tool draws each map from your car's position while you drive with ACC focused. Drive one full lap on a new track to complete its map. Until then, the dialog shows how much is recorded, and you can only place markers on the parts you've driven. Maps are saved per track in `RepeatCorner.maps.json` beside the executable. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
+To use a map right away, download the matching `.bin` from the [Race Element ACC map files](https://github.com/RiddleTime/Race-Element/tree/dev/Race_Element.HUD.ACC/Overlays/Driving/TrackMap/Data/ACC) and keep its original filename, such as `monza.bin`. Open **Place on map… → Import map…** and choose the file. The import applies to the track of the selected checkpoint and keeps its timing markers and run history.
+
+You can also draw a map by driving a lap with ACC focused and Repeat Corner open. While the map is incomplete, the dialog shows how much is recorded, and you can place markers on the parts you've driven. Maps are saved per track in `RepeatCorner.maps.json` beside the executable. Pausing, leaving the track session, or switching focus interrupts the current timed attempt.
 
 ### Review your runs
 
