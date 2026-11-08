@@ -9,6 +9,7 @@ internal static partial class RepeatCorner
     public sealed class Attempt
     {
         public double Seconds, EntrySpeed, ExitSpeed;
+        public double? PreviousBestDelta;
     }
 
     private static void SetFinish(Section section, double position)
@@ -29,7 +30,8 @@ internal static partial class RepeatCorner
             section.RecentAttempts.RemoveRange(RecentAttemptLimit, section.RecentAttempts.Count - RecentAttemptLimit);
         if (previousBest == null || attempt.Seconds < previousBest.Seconds)
             section.BestAttempt = attempt;
-        return previousBest == null ? (double?)null : attempt.Seconds - previousBest.Seconds;
+        attempt.PreviousBestDelta = previousBest == null ? (double?)null : attempt.Seconds - previousBest.Seconds;
+        return attempt.PreviousBestDelta;
     }
 
     private static string DescribeAttempt(Attempt attempt)
@@ -47,8 +49,8 @@ internal static partial class RepeatCorner
             DescribeAttempt(attempt), comparison, newBest ? " | New best" : "");
 
         try { StoreSettings(); }
-        catch (IOException error) { Console.WriteLine("Could not save attempt history: " + error.Message); }
-        catch (UnauthorizedAccessException error) { Console.WriteLine("Could not save attempt history: " + error.Message); }
+        catch (IOException error) { ReportStatus("Could not save attempt history. " + error.Message); }
+        catch (UnauthorizedAccessException error) { ReportStatus("Could not save attempt history. " + error.Message); }
     }
 
     private static void PrintHistory()

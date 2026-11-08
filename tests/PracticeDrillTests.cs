@@ -175,6 +175,8 @@ internal static partial class RepeatCorner
         var restored = Json.Deserialize<ToolSettings>(Json.Serialize(legacy)).Sections[0];
         Require(restored.RecentAttempts.Count == 5 && restored.BestAttempt.EntrySpeed == completedRun.EntrySpeed,
             "History did not persist through a settings round-trip.");
+        Require(restored.RecentAttempts[0].PreviousBestDelta == 16 - completedRun.Seconds,
+            "The latest attempt lost its comparison to the previous best.");
         var fasterRun = new Attempt { Seconds = completedRun.Seconds / 2 };
         Require(RecordAttempt(restored, fasterRun) < 0 && restored.BestAttempt == fasterRun,
             "An improved run did not replace the best or show a negative delta.");
