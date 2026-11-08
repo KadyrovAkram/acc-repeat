@@ -559,7 +559,7 @@ internal static partial class RepeatCorner
             var point = Map.PointAt(LoadPosition.Value, requireAdjacentPoints: true);
             if (!point.HasValue) return;
             var at = ToScreen(point.Value);
-            float radius = 16 * dpi;
+            float radius = 10 * dpi;
             var diamond = new[]
             {
                 new PointF(at.X, at.Y - radius), new PointF(at.X + radius, at.Y),
