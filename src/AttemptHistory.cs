@@ -10,6 +10,36 @@ internal static partial class RepeatCorner
     {
         public double Seconds, EntrySpeed, ExitSpeed;
         public double? PreviousBestDelta;
+        // Metres driven between the markers; 0 for runs recorded before this was measured.
+        public double Path;
+    }
+
+    // ACC marks every lap invalid as soon as a save loads, so its lap-validity flag can't
+    // separate clean runs from cut ones. A run that is clearly shorter than the usual line
+    // through the section is treated as a cut instead.
+    private const double CutMinimumMetres = 4, CutFraction = 0.01;
+
+    // The most recent run that was discarded as a cut, until a run is recorded.
+    private static Section cutSection;
+    private static Attempt cutRun;
+    private static double cutShortBy;
+
+    private static void ReportCut(Section section, Attempt attempt, double shortBy)
+    {
+        cutSection = section;
+        cutRun = attempt;
+        cutShortBy = shortBy;
+        ReportStatus(string.Format("Run not counted: {0:0.00} s, but {1:0} m shorter than your usual line. " +
+            "Looks like a cut.", attempt.Seconds, shortBy));
+    }
+
+    private static double? CutMetres(Section section, Attempt attempt)
+    {
+        var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
+        if (paths.Length == 0 || attempt.Path <= 0) return null;
+        double usual = paths[paths.Length / 2];
+        double shorter = usual - attempt.Path;
+        return shorter > Math.Max(CutMinimumMetres, usual * CutFraction) ? shorter : (double?)null;
     }
 
     private static void SetFinish(Section section, double position)
@@ -42,11 +72,14 @@ internal static partial class RepeatCorner
 
     private static void ReportAttempt(Section section, Attempt attempt)
     {
+        cutSection = null;
+        cutRun = null;
         double? delta = RecordAttempt(section, attempt);
         string comparison = delta.HasValue ? string.Format(" | {0:+0.00;-0.00;0.00} s vs previous best", delta.Value) : "";
         bool newBest = !delta.HasValue || delta.Value < 0;
         Console.WriteLine("{0}: {1}{2}{3}", section.Checkpoint ?? section.Track,
             DescribeAttempt(attempt), comparison, newBest ? " | New best" : "");
+        if (desktopSession != null) desktopSession.Note(string.Format("Run recorded: {0:0.00} s.", attempt.Seconds));
 
         try { StoreSettings(); }
         catch (IOException error) { ReportStatus("Could not save attempt history. " + error.Message); }

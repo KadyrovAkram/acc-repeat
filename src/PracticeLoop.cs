@@ -45,7 +45,7 @@ internal static partial class RepeatCorner
             settings.ActiveCheckpoint ?? save.Label, delay));
     }
 
-    private static void StartLoopCountdown(Section section, Attempt attempt)
+    private static void StartLoopCountdown(Section section, string announcement)
     {
         if (loopSave == null || countdown != null) return;
         if (!SameTrack(section.Track, loopSave.Track))
@@ -54,7 +54,7 @@ internal static partial class RepeatCorner
             return;
         }
         loopWindow = game;
-        resultAnnouncement = SpeakLoop(string.Format("{0:0.00} seconds.", attempt.Seconds));
+        resultAnnouncement = SpeakLoop(announcement);
         countdown = new LoopCountdown(sectionClock.Elapsed.TotalSeconds, loopDelay);
         nextLoopCheck = 0;
         telemetryMissingSince = null;

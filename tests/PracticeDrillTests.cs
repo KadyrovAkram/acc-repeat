@@ -43,6 +43,9 @@ internal static partial class RepeatCorner
         Require(result != null && Math.Abs(result.Seconds - 0.1) < 0.000001 &&
             Math.Abs(result.EntrySpeed - 110) < 0.000001 && Math.Abs(result.ExitSpeed - 130) < 0.000001,
             "Crossing interpolation or lap wrap is incorrect.");
+        // Half of each 0.1 s frame at 110 km/h and 130 km/h average speed.
+        Require(Math.Abs(result.Path - (110 + 130) / 3.6 * 0.05) < 0.000001,
+            "The driven distance between the markers is incorrect.");
 
         timer.Reset();
         var normal = new Section { Track = "monza", Start = 0.1, Finish = 0.102 };
@@ -59,6 +62,17 @@ internal static partial class RepeatCorner
         Require(timer.Observe(normal, Frame(4, 0.103, 0.3, 6, 120)) == null,
             "An interrupted run counted after resuming mid-section.");
 
+        timer.Reset();
+        var longer = new Section { Track = "monza", Start = 0.1, Finish = 0.106 };
+        timer.Observe(longer, Frame(1, 0.099, 0.0, 0, 72));
+        timer.Observe(longer, Frame(2, 0.101, 0.1, 2, 72));
+        timer.Observe(longer, Frame(3, 0.103, 0.2, 4, 72));
+        timer.Observe(longer, Frame(4, 0.105, 0.3, 6, 72));
+        var steady = timer.Observe(longer, Frame(5, 0.107, 0.4, 8, 72));
+        Require(steady != null && Math.Abs(steady.Path - 6) < 0.000001,
+            "Driven distance was not summed across frames.");
+
+        VerifyCutDetection();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
         VerifyLoopCountdown();
@@ -200,6 +214,25 @@ internal static partial class RepeatCorner
         countdown = new LoopCountdown(10, 3);
         DisableLoop("test cancellation");
         Require(countdown == null && loopSave == null, "Stopping the loop left an automatic retry armed.");
+    }
+
+    private static void VerifyCutDetection()
+    {
+        var section = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
+        Require(!CutMetres(section, new Attempt { Seconds = 28, Path = 700 }).HasValue,
+            "A run was called a cut with no earlier runs to compare against.");
+
+        foreach (double path in new[] { 812.0, 809.0, 814.0 })
+            section.RecentAttempts.Add(new Attempt { Seconds = 29, Path = path });
+        section.RecentAttempts.Add(new Attempt { Seconds = 29 });
+        Require(!CutMetres(section, new Attempt { Seconds = 28.9, Path = 806 }).HasValue,
+            "A slightly tighter line was called a cut.");
+        Require(!CutMetres(section, new Attempt { Seconds = 28.5, Path = 830 }).HasValue,
+            "Running wide was called a cut.");
+        var cut = CutMetres(section, new Attempt { Seconds = 27.4, Path = 790 });
+        Require(cut.HasValue && Math.Abs(cut.Value - 22) < 0.000001, "A chicane cut was not detected.");
+        Require(!CutMetres(section, new Attempt { Seconds = 27.4 }).HasValue,
+            "A run without a measured distance was called a cut.");
     }
 
     private static void VerifyAttemptHistory(Attempt completedRun)
