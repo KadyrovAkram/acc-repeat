@@ -18,6 +18,10 @@ internal static partial class RepeatCorner
         private readonly PillButton placeFinish = new PillButton("Finish");
         private readonly PillButton save = new PillButton("Save markers") { Primary = true };
         private readonly Label positions = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false, AutoEllipsis = true };
+        private readonly Label loadLegend = new Label
+        {
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Amber, AutoEllipsis = true
+        };
         private readonly Timer refresh = new Timer { Interval = 500 };
         private readonly double? originalStart, originalFinish;
         private bool placingStart = true;
@@ -29,6 +33,7 @@ internal static partial class RepeatCorner
             originalStart = canvas.Start = view.Start;
             originalFinish = canvas.Finish = view.Finish;
             canvas.Map = view.Map;
+            ShowLoadPosition(view.LoadPosition);
 
             Text = "Place markers · " + track;
             BackColor = Theme.Surface;
@@ -64,12 +69,13 @@ internal static partial class RepeatCorner
             top.Controls.Add(placeStart, 2, 0);
             top.Controls.Add(placeFinish, 3, 0);
 
-            var mapTools = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, Margin = Padding.Empty };
+            var mapTools = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, Margin = Padding.Empty };
             mapTools.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
             mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
             mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
             mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            mapTools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             var zoomOut = new PillButton("−") { AccessibleName = "Zoom out" };
             var zoomIn = new PillButton("+") { AccessibleName = "Zoom in" };
             var fitTrack = new PillButton("Fit") { AccessibleName = "Fit whole track" };
@@ -82,6 +88,7 @@ internal static partial class RepeatCorner
             mapTools.Controls.Add(zoomIn, 1, 0);
             mapTools.Controls.Add(fitTrack, 2, 0);
             mapTools.Controls.Add(mapHelp, 3, 0);
+            mapTools.Controls.Add(loadLegend, 4, 0);
 
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Margin = Padding.Empty };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -114,14 +121,22 @@ internal static partial class RepeatCorner
             refresh.Tick += (sender, args) =>
             {
                 var latest = session.Snapshot;
-                if (latest != null && latest.Map != null && latest.Map != canvas.Map && SameTrack(latest.Map.Track, track))
+                if (latest != null && SameTrack(latest.Track, track) &&
+                    (latest.Map != canvas.Map || latest.LoadPosition != canvas.LoadPosition))
                 {
                     canvas.Map = latest.Map;
+                    ShowLoadPosition(latest.LoadPosition);
                     canvas.Invalidate();
                 }
             };
             refresh.Start();
             SetMode(!canvas.Start.HasValue || canvas.Finish.HasValue);
+        }
+
+        private void ShowLoadPosition(double? position)
+        {
+            canvas.LoadPosition = position;
+            loadLegend.Text = position.HasValue ? string.Format("◆ Load {0:0.00%}", position.Value) : "Load position unavailable";
         }
 
         protected override void Dispose(bool disposing)
@@ -240,6 +255,7 @@ internal static partial class RepeatCorner
         public TrackMapView Map;
         public double? Start { get; set; }
         public double? Finish { get; set; }
+        public double? LoadPosition { get; set; }
         public bool PlacingStart = true;
         public event Action<double> Picked;
         private const double ZoomStep = 1.25, MaxZoom = 12;
@@ -447,6 +463,7 @@ internal static partial class RepeatCorner
                         graphics.DrawLines(pen, section);
             }
             DrawDirection(graphics, dpi);
+            DrawLoadPosition(graphics, dpi);
             if (Start.HasValue) DrawMarker(graphics, Start.Value, Theme.Green, "S", dpi);
             if (Finish.HasValue) DrawMarker(graphics, Finish.Value, Theme.Text, "F", dpi);
             if (hover.HasValue)
@@ -534,6 +551,22 @@ internal static partial class RepeatCorner
                     new PointF(head.X - dx * size - dy * size, head.Y - dy * size + dx * size),
                     new PointF(head.X - dx * size + dy * size, head.Y - dy * size - dx * size)
                 });
+        }
+
+        private void DrawLoadPosition(Graphics graphics, float dpi)
+        {
+            if (!LoadPosition.HasValue) return;
+            var point = Map.PointAt(LoadPosition.Value, requireAdjacentPoints: true);
+            if (!point.HasValue) return;
+            var at = ToScreen(point.Value);
+            float radius = 10 * dpi;
+            var diamond = new[]
+            {
+                new PointF(at.X, at.Y - radius), new PointF(at.X + radius, at.Y),
+                new PointF(at.X, at.Y + radius), new PointF(at.X - radius, at.Y)
+            };
+            using (var fill = new SolidBrush(Theme.Amber)) graphics.FillPolygon(fill, diamond);
+            using (var edge = new Pen(Theme.Background, 2 * dpi)) graphics.DrawPolygon(edge, diamond);
         }
 
         private void DrawMarker(Graphics graphics, double position, Color colour, string letter, float dpi)

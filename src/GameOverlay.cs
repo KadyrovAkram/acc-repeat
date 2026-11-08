@@ -4,11 +4,12 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-// A small click-through panel drawn over the ACC window while it is focused.
+// A small click-through panel drawn over focused ACC practice sessions.
 // Retry reads ACC's menus from the screen, so the overlay hides before every reload,
 // is excluded from screen capture where Windows supports it, and never takes focus.
 internal static partial class RepeatCorner
@@ -17,6 +18,18 @@ internal static partial class RepeatCorner
     private const string DefaultOverlayPosition = "Top centre";
     private static volatile IntPtr overlayHandle;
     private static volatile bool overlaySuppressed;
+
+    private static bool IsPracticeSessionActive()
+    {
+        try
+        {
+            int status = PracticeStatus();
+            return status == 2 || status == 3;
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (ArgumentException) { return false; }
+    }
 
     // Engine thread: called as a reload starts, before any menu is captured.
     private static void HideOverlayNow()
@@ -66,7 +79,7 @@ internal static partial class RepeatCorner
         public void Update(DeskSnapshot view)
         {
             Rectangle client;
-            if (view == null || view.Error != null || view.Reloading || overlaySuppressed ||
+            if (view == null || view.Error != null || !view.InPracticeSession || view.Reloading || overlaySuppressed ||
                 view.OverlayPosition == "Off" || !GameInFront(out client))
             {
                 Hide();

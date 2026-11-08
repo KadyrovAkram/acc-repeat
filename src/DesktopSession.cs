@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -16,6 +17,8 @@ internal static partial class RepeatCorner
         private string message = "";
         private string shortcutWarning = "";
         private Save[] saves = new Save[0];
+        private Save loadPositionSave;
+        private double? loadPosition;
         private string savesError;
         private bool connected;
         private double nextRefresh, nextPublish;
@@ -71,7 +74,8 @@ internal static partial class RepeatCorner
             if (!immediate && now < nextPublish) return;
             nextPublish = now + 0.15;
 
-            if (!reloadInProgress && now >= nextRefresh)
+            bool refreshed = !reloadInProgress && now >= nextRefresh;
+            if (refreshed)
             {
                 nextRefresh = now + 1;
                 RefreshSaveList();
@@ -87,18 +91,27 @@ internal static partial class RepeatCorner
             if (selected != null)
                 checkpointDetail = (selected.TrackDisplayName ?? selected.Track) + " · Free Practice";
 
+            if (selected != null && (loadPositionSave == null || !selected.SameSave(loadPositionSave) ||
+                (refreshed && !loadPosition.HasValue)))
+            {
+                loadPosition = ReadLoadPosition(Path.Combine(SaveDirectory, selected.Slot + "R.json"));
+                loadPositionSave = selected;
+            }
+
             var activePin = FindCheckpoint(settings.ActiveCheckpoint);
             string track = selected != null ? selected.Track : activePin == null ? null : activePin.Track;
             var section = track == null ? null : CurrentSection(track);
             snapshot = new DeskSnapshot
             {
                 Connected = connected,
+                InPracticeSession = connected && !reloadInProgress && settings.Overlay != "Off" && IsPracticeSessionActive(),
                 PinNames = settings.Checkpoints.Select(pin => pin.Name).ToArray(),
                 ActivePin = settings.ActiveCheckpoint,
                 AvailableSaves = saves.Where(save => save.Row < VisibleSaveRows && save.Mode == "Practice").ToArray(),
                 CheckpointDetail = checkpointDetail,
                 Start = section == null ? (double?)null : section.Start,
                 Finish = section == null ? null : section.Finish,
+                LoadPosition = selected == null ? null : loadPosition,
                 Recent = section == null ? new Attempt[0] : section.RecentAttempts.ToArray(),
                 Best = section == null ? null : section.BestAttempt,
                 Wheel = settings.Wheel,
@@ -166,7 +179,7 @@ internal static partial class RepeatCorner
         public Attempt[] Recent;
         public Attempt Best;
         public WheelBinding Wheel;
-        public double? Start, Finish;
-        public bool Connected, LearningWheel, LoopArmed, CanArm, Reloading;
+        public double? Start, Finish, LoadPosition;
+        public bool Connected, InPracticeSession, LearningWheel, LoopArmed, CanArm, Reloading;
     }
 }

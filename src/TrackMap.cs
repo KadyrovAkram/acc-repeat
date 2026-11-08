@@ -62,7 +62,7 @@ internal static partial class RepeatCorner
         }
 
         // Each point stands for the middle of its 0.1% slice of the lap.
-        public PointF? PointAt(double position)
+        public PointF? PointAt(double position, bool requireAdjacentPoints = false)
         {
             if (IsEmpty) return null;
             double slice = WrapPosition(position) * MapBins - 0.5;
@@ -70,6 +70,7 @@ internal static partial class RepeatCorner
             double fraction = slice - Math.Floor(slice);
             if (Filled[index] && Filled[next])
                 return new PointF((float)(X[index] + (X[next] - X[index]) * fraction), (float)(Z[index] + (Z[next] - Z[index]) * fraction));
+            if (requireAdjacentPoints) return null;
             for (int offset = 0; offset < MapBins / 2; offset++)
             {
                 if (Filled[(index - offset + MapBins) % MapBins]) { int at = (index - offset + MapBins) % MapBins; return new PointF((float)X[at], (float)Z[at]); }
