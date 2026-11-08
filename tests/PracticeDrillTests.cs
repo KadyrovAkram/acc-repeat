@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 
 internal static class PracticeDrillTests
@@ -75,6 +76,7 @@ internal static partial class RepeatCorner
 
         VerifyCutDetection();
         VerifyTrackMap();
+        VerifyTrackMapImport();
         VerifyRunRemoval();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
@@ -254,6 +256,61 @@ internal static partial class RepeatCorner
         var restored = Json.Deserialize<System.Collections.Generic.List<TrackMap>>(Json.Serialize(new[] { half }));
         Require(restored.Count == 1 && restored[0].Filled.Count(filled => filled) == MapBins / 2 &&
             restored[0].X[10] == half.X[10], "A track map failed to round-trip.");
+    }
+
+    private static void VerifyTrackMapImport()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "monza.bin");
+        try
+        {
+            using (var writer = new BinaryWriter(File.Create(path)))
+            {
+                writer.Write(new byte[] { 0x72, 0x65, 0x74, 0x6d });
+                writer.Write((ushort)1);
+                writer.Write(0L);
+                for (int sample = MapBins - 1; sample >= 0; sample--)
+                {
+                    float position = (sample + 0.25f) / MapBins;
+                    double angle = position * 2 * Math.PI;
+                    writer.Write((float)(900 * Math.Cos(angle)));
+                    writer.Write((float)(900 * Math.Sin(angle)));
+                    writer.Write(position);
+                }
+            }
+            var map = ReadTrackMapFile("monza", path);
+            var view = TrackMapView.From("monza", map);
+            Require(map.Imported && view.Coverage == 1, "A complete import did not fill the lap.");
+            foreach (double position in new[] { 0, 0.0405, 0.1807 })
+            {
+                var point = view.PointAt(position).Value;
+                double gap;
+                var picked = view.Nearest(point.X, point.Y, out gap);
+                Require(picked.HasValue && Math.Min(Math.Abs(position - picked.Value), 1 - Math.Abs(position - picked.Value)) < 0.00001,
+                    "An imported map point picked a different lap position.");
+            }
+
+            try
+            {
+                ReadTrackMapFile("spa", path);
+                throw new Exception("The import accepted another circuit's map.");
+            }
+            catch (InvalidDataException) { }
+
+            using (var stream = File.OpenWrite(path)) stream.SetLength(stream.Length - 12 * 50);
+            try
+            {
+                ReadTrackMapFile("monza", path);
+                throw new Exception("The import accepted a map with a large gap.");
+            }
+            catch (InvalidDataException) { }
+        }
+        finally
+        {
+            File.Delete(path);
+            Directory.Delete(directory);
+        }
     }
 
     private static void VerifyRunRemoval()

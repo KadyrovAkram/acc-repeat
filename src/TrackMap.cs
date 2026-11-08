@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Web.Script.Serialization;
 
-// ACC doesn't publish track outlines, so the tool draws its own from the car's position
-// while you drive: one point per 0.1% of the lap, saved per track beside the settings.
+// Maps imported or drawn from ACC telemetry share one point per 0.1% of the lap.
 internal static partial class RepeatCorner
 {
     private const int MapBins = 1000;
     private static readonly string MapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RepeatCorner.maps.json");
+    private static readonly JavaScriptSerializer MapJson = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
     private static List<TrackMap> trackMaps = new List<TrackMap>();
     private static bool mapsDirty;
     private static int mapVersion, cachedMapVersion = -1;
@@ -19,6 +20,7 @@ internal static partial class RepeatCorner
     public sealed class TrackMap
     {
         public string Track;
+        public bool Imported;
         public double[] X = new double[MapBins], Z = new double[MapBins];
         public bool[] Filled = new bool[MapBins];
 
@@ -103,7 +105,8 @@ internal static partial class RepeatCorner
 
     private static TrackMap FindTrackMap(string track)
     {
-        return trackMaps.Find(map => SameTrack(map.Track, track));
+        return trackMaps.Find(map => map.Imported && SameTrack(map.Track, track)) ??
+            trackMaps.Find(map => SameTrack(map.Track, track));
     }
 
     // Engine thread: a copy is made only when the map gains points or the track changes.
@@ -121,7 +124,7 @@ internal static partial class RepeatCorner
     {
         try
         {
-            trackMaps = File.Exists(MapsPath) ? Json.Deserialize<List<TrackMap>>(File.ReadAllText(MapsPath)) : null;
+            trackMaps = File.Exists(MapsPath) ? MapJson.Deserialize<List<TrackMap>>(File.ReadAllText(MapsPath)) : null;
         }
         catch (Exception error)
         {
@@ -139,14 +142,19 @@ internal static partial class RepeatCorner
         if (!mapsDirty) return;
         try
         {
-            string pending = MapsPath + ".tmp";
-            File.WriteAllText(pending, Json.Serialize(trackMaps));
-            if (File.Exists(MapsPath)) File.Replace(pending, MapsPath, null);
-            else File.Move(pending, MapsPath);
+            WriteTrackMaps(trackMaps);
             mapsDirty = false;
         }
         catch (IOException error) { ReportStatus("Could not save the track map. " + error.Message); }
         catch (UnauthorizedAccessException error) { ReportStatus("Could not save the track map. " + error.Message); }
+    }
+
+    private static void WriteTrackMaps(List<TrackMap> maps)
+    {
+        string pending = MapsPath + ".tmp";
+        File.WriteAllText(pending, MapJson.Serialize(maps));
+        if (File.Exists(MapsPath)) File.Replace(pending, MapsPath, null);
+        else File.Move(pending, MapsPath);
     }
 
     private static void PollTrackMap()
@@ -163,6 +171,7 @@ internal static partial class RepeatCorner
         var frame = ReadTelemetry(false);
         if (frame == null || !frame.HasCoordinates || frame.Speed < 10) return;
         var map = FindTrackMap(frame.Track);
+        if (map != null && map.Imported) return;
         if (map == null)
         {
             map = new TrackMap { Track = frame.Track };
