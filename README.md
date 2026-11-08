@@ -45,7 +45,7 @@ History is stored with the timing markers in `RepeatCorner.settings.json`. Chang
 
 ### Cut runs aren't recorded
 
-The tool measures how far the car actually drove between the markers. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut. The run isn't added to your history or personal best. The Practice desk says by how much it was short, and in a loop the voice says "Cut. Not counted." before retrying.
+The tool measures how far the car actually drove between the markers. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut. The run isn't added to your history or personal best. The Practice desk says by how much it was short, the in-game overlay shows **Cut · not counted** with the run's time until your next run, and in a loop the voice says "Cut. Not counted." before retrying.
 
 ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first run on a new pair of markers has nothing to compare against, so it's always recorded.
 

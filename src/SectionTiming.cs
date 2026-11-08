@@ -101,8 +101,7 @@ internal static partial class RepeatCorner
         double? cut = CutMetres(sectionOnTrack, result);
         if (cut.HasValue)
         {
-            ReportStatus(string.Format("Run not counted: {0:0.00} s, but {1:0} m shorter than your usual line. " +
-                "Looks like a cut.", result.Seconds, cut.Value));
+            ReportCut(sectionOnTrack, result, cut.Value);
             StartLoopCountdown(sectionOnTrack, "Cut. Not counted.");
             return;
         }

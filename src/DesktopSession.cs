@@ -108,6 +108,8 @@ internal static partial class RepeatCorner
                 Reloading = reloadInProgress,
                 OverlayPosition = OverlayPositions.Contains(settings.Overlay) ? settings.Overlay : DefaultOverlayPosition,
                 LiveStart = timer.StartedAt,
+                LastCut = section != null && section == cutSection ? cutRun : null,
+                LastCutShortBy = cutShortBy,
                 Countdown = countdown == null || countdown.IsSuspended || countdown.RemainingSeconds < 0 ?
                     (int?)null : countdown.RemainingSeconds,
                 Status = DescribeStatus(connected, selected),
@@ -154,6 +156,8 @@ internal static partial class RepeatCorner
         public string ActivePin, CheckpointDetail, Status, Detail, ShortcutWarning, Error, OverlayPosition;
         public double? LiveStart;
         public int? Countdown;
+        public Attempt LastCut;
+        public double LastCutShortBy;
         public string[] PinNames;
         public Save[] AvailableSaves;
         public Attempt[] Recent;

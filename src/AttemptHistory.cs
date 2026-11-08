@@ -19,6 +19,20 @@ internal static partial class RepeatCorner
     // through the section is treated as a cut instead.
     private const double CutMinimumMetres = 4, CutFraction = 0.01;
 
+    // The most recent run that was discarded as a cut, until a run is recorded.
+    private static Section cutSection;
+    private static Attempt cutRun;
+    private static double cutShortBy;
+
+    private static void ReportCut(Section section, Attempt attempt, double shortBy)
+    {
+        cutSection = section;
+        cutRun = attempt;
+        cutShortBy = shortBy;
+        ReportStatus(string.Format("Run not counted: {0:0.00} s, but {1:0} m shorter than your usual line. " +
+            "Looks like a cut.", attempt.Seconds, shortBy));
+    }
+
     private static double? CutMetres(Section section, Attempt attempt)
     {
         var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
@@ -58,6 +72,8 @@ internal static partial class RepeatCorner
 
     private static void ReportAttempt(Section section, Attempt attempt)
     {
+        cutSection = null;
+        cutRun = null;
         double? delta = RecordAttempt(section, attempt);
         string comparison = delta.HasValue ? string.Format(" | {0:+0.00;-0.00;0.00} s vs previous best", delta.Value) : "";
         bool newBest = !delta.HasValue || delta.Value < 0;
