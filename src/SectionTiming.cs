@@ -176,8 +176,16 @@ internal static partial class RepeatCorner
                 if (trackName.Length == 0 || !(position >= 0 && position <= 1) ||
                     !(distance >= 0 && distance < double.PositiveInfinity) || !(speed >= 0 && speed < 500))
                     return null;
+                // The player's car in carCoordinates, matched by ID; x and z are the ground plane.
+                int active = Math.Min(60, Math.Max(0, graphics.ReadInt32(252)));
+                int player = graphics.ReadInt32(1216), slot = -1;
+                for (int car = 0; car < active && slot < 0; car++)
+                    if (graphics.ReadInt32(976 + car * 4) == player) slot = car;
                 return new TelemetryFrame
                 {
+                    HasCoordinates = slot >= 0,
+                    X = slot >= 0 ? graphics.ReadSingle(256 + slot * 12) : 0,
+                    Z = slot >= 0 ? graphics.ReadSingle(264 + slot * 12) : 0,
                     Track = trackName, Position = position, Distance = distance, Speed = speed,
                     Packet = graphics.ReadInt32(0), Time = sectionClock.Elapsed.TotalSeconds, Paused = status == 3
                 };
@@ -194,6 +202,8 @@ internal static partial class RepeatCorner
         public int Packet;
         public bool Paused;
         public double Position, Distance, Speed, Time;
+        public bool HasCoordinates;
+        public double X, Z;
     }
 
     private sealed class SectionTimer
