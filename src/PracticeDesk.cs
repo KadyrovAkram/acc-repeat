@@ -26,26 +26,14 @@ internal static partial class RepeatCorner
 
     private sealed class PracticeDesk : Form
     {
-        private static readonly Color Background = Color.FromArgb(28, 29, 33);
-        private static readonly Color Surface = Color.FromArgb(35, 37, 42);
-        private static readonly Color Inset = Color.FromArgb(44, 46, 53);
-        private static readonly Color TextColor = Color.FromArgb(244, 244, 248);
-        private static readonly Color Muted = Color.FromArgb(184, 186, 196);
-        private static readonly Color Red = Color.FromArgb(172, 32, 53);
-        private static readonly Color Green = Color.FromArgb(125, 225, 174);
-
         private readonly DesktopSession session;
         private readonly Timer refreshTimer = new Timer { Interval = 100 };
-        private readonly ComboBox checkpoint = Picker("Active checkpoint");
-        private readonly Button pinButton = ActionButton("Pin a save…");
-        private readonly Button loopButton = ActionButton("Arm loop");
-        private readonly Button bindButton = ActionButton("Bind wheel");
-        private readonly Button clearWheel = ActionButton("Clear");
-        private readonly NumericUpDown delay = new NumericUpDown
-        {
-            Minimum = 1, Maximum = 30, Value = 3, Width = 54, AccessibleName = "Countdown seconds",
-            BackColor = Inset, ForeColor = TextColor
-        };
+        private readonly DarkPicker checkpoint = new DarkPicker("Active checkpoint");
+        private readonly PillButton pinButton = new PillButton("Pin a save…");
+        private readonly PillButton loopButton = new PillButton("Arm loop");
+        private readonly PillButton bindButton = new PillButton("Bind wheel");
+        private readonly PillButton clearWheel = new PillButton("Clear");
+        private readonly Stepper delay = new Stepper("Countdown", 1, 30, 3);
         private readonly Label connection = Caption("Waiting for ACC", 10);
         private readonly Label checkpointDetail = Caption("", 9);
         private readonly Label start = Caption("Start   —", 10);
@@ -53,12 +41,13 @@ internal static partial class RepeatCorner
         private readonly Label status = Caption("Starting…", 10);
         private readonly Label wheel = Caption("Wheel unbound", 9);
         private readonly Label detail = Caption("", 9);
-        private readonly Label time = Caption("—", 37);
+        private readonly Label time = Caption("—", 40);
         private readonly Label best = Caption("Personal best   —", 11);
         private readonly Label entry = Caption("—", 17);
         private readonly Label exit = Caption("—", 17);
         private readonly Label emptyHistory = Caption("Cross both timing markers to record a run.", 10);
-        private readonly DataGridView history = CreateHistory();
+        private readonly AttemptList history = new AttemptList { Dock = DockStyle.Fill, Visible = false };
+        private TableLayoutPanel wheelRow;
         private DeskSnapshot displayed;
         private string[] pinNames = new string[0];
         private Attempt[] displayedAttempts = new Attempt[0];
@@ -70,19 +59,20 @@ internal static partial class RepeatCorner
             SuspendLayout();
             Text = "ACC Repeat Corner";
             Font = new Font("Segoe UI", 10);
-            BackColor = Background;
-            ForeColor = TextColor;
-            ClientSize = new Size(1000, 620);
-            MinimumSize = new Size(820, 625);
+            BackColor = Theme.Background;
+            ForeColor = Theme.Text;
+            ClientSize = new Size(1000, 660);
+            MinimumSize = new Size(840, 700);
             StartPosition = FormStartPosition.CenterScreen;
+            Theme.UseDarkTitleBar(this);
 
             var root = Stack(1);
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 57));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 57));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
             root.Controls.Add(BuildHeader(), 0, 0);
             var workspace = Stack(2);
-            workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 286));
+            workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 292));
             workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             workspace.Controls.Add(BuildSidebar(), 0, 0);
             workspace.Controls.Add(BuildResults(), 1, 0);
@@ -102,16 +92,14 @@ internal static partial class RepeatCorner
             SetActions(false);
             Shown += (sender, args) =>
             {
-                using (var graphics = CreateGraphics())
-                {
-                    int rowHeight = (int)Math.Round(27 * graphics.DpiY / 96);
-                    history.RowTemplate.Height = rowHeight;
-                    history.ColumnHeadersHeight = rowHeight;
-                }
                 session.Start();
                 refreshTimer.Start();
             };
-            FormClosed += (sender, args) => session.Stop();
+            FormClosed += (sender, args) =>
+            {
+                refreshTimer.Stop();
+                session.Stop();
+            };
         }
 
         protected override void Dispose(bool disposing)
@@ -123,13 +111,13 @@ internal static partial class RepeatCorner
         private Control BuildHeader()
         {
             var header = Stack(3);
-            header.BackColor = Surface;
+            header.BackColor = Theme.Surface;
             header.Padding = new Padding(18, 9, 18, 9);
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
             var mark = Caption("RC", 11);
-            mark.BackColor = Red;
+            mark.BackColor = Theme.Red;
             mark.Font = new Font("Segoe UI", 11, FontStyle.Bold | FontStyle.Italic);
             mark.TextAlign = ContentAlignment.MiddleCenter;
             mark.Margin = new Padding(0, 4, 7, 4);
@@ -145,37 +133,43 @@ internal static partial class RepeatCorner
         private Control BuildSidebar()
         {
             var sidebar = Stack(1);
-            sidebar.Padding = new Padding(18, 13, 18, 8);
-            sidebar.BackColor = Surface;
-            AddRow(sidebar, SectionHeading("Active checkpoint"), 21);
+            sidebar.Padding = new Padding(18, 10, 16, 8);
+            sidebar.BackColor = Theme.Surface;
+            AddRow(sidebar, SectionHeading("Active checkpoint"), 26);
             checkpoint.Dock = DockStyle.Fill;
-            AddRow(sidebar, checkpoint, 31);
-            checkpointDetail.ForeColor = Muted;
-            checkpointDetail.TextAlign = ContentAlignment.TopLeft;
-            AddRow(sidebar, checkpointDetail, 42);
-            AddRow(sidebar, pinButton, 31);
-            AddRow(sidebar, SectionHeading("Timing section"), 33);
+            AddRow(sidebar, checkpoint, 36);
+            checkpointDetail.ForeColor = Theme.Muted;
+            AddRow(sidebar, checkpointDetail, 26);
+            AddRow(sidebar, pinButton, 36);
+
+            AddRow(sidebar, SectionHeading("Timing section"), 36);
             var markers = TwoColumns(start, finish);
-            markers.BackColor = Inset;
-            markers.Padding = new Padding(9, 0, 5, 0);
+            markers.BackColor = Theme.Inset;
+            markers.Padding = new Padding(10, 0, 6, 0);
+            markers.Margin = new Padding(0, 0, 6, 0);
             AddRow(sidebar, markers, 34);
 
-            AddRow(sidebar, SectionHeading("Hands-free loop"), 34);
-            AddRow(sidebar, status, 42);
+            AddRow(sidebar, SectionHeading("Hands-free loop"), 36);
+            AddRow(sidebar, status, 30);
             var countdown = Stack(2);
             countdown.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             countdown.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            countdown.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
-            countdown.Controls.Add(Caption("Countdown (seconds)", 9), 0, 0);
-            delay.Anchor = AnchorStyles.Left;
+            countdown.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126));
+            var countdownLabel = Caption("Countdown", 9);
+            countdownLabel.ForeColor = Theme.Muted;
+            countdown.Controls.Add(countdownLabel, 0, 0);
+            delay.Margin = new Padding(0, 0, 6, 0);
             countdown.Controls.Add(delay, 1, 0);
-            AddRow(sidebar, countdown, 30);
-            loopButton.BackColor = Red;
-            AddRow(sidebar, loopButton, 32);
+            AddRow(sidebar, countdown, 34);
+            loopButton.Primary = true;
+            AddRow(sidebar, loopButton, 38);
 
-            AddRow(sidebar, SectionHeading("Wheel retry"), 33);
-            AddRow(sidebar, wheel, 25);
-            AddRow(sidebar, TwoColumns(bindButton, clearWheel), 32);
+            AddRow(sidebar, SectionHeading("Wheel retry"), 36);
+            wheel.ForeColor = Theme.Muted;
+            AddRow(sidebar, wheel, 24);
+            wheelRow = TwoColumns(bindButton, clearWheel);
+            AddRow(sidebar, wheelRow, 36);
+
             sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             sidebar.Controls.Add(new Panel { Margin = Padding.Empty }, 0, sidebar.RowStyles.Count - 1);
             return sidebar;
@@ -184,16 +178,17 @@ internal static partial class RepeatCorner
         private Control BuildResults()
         {
             var results = Stack(1);
-            results.Padding = new Padding(24, 13, 24, 8);
+            results.Padding = new Padding(26, 14, 26, 8);
             AddRow(results, SectionHeading("Last attempt"), 22);
-            time.Font = new Font("Segoe UI", 37, FontStyle.Bold);
-            AddRow(results, time, 66);
+            time.Font = new Font("Segoe UI", 40, FontStyle.Bold);
+            time.Margin = new Padding(0, 0, 0, 0);
+            AddRow(results, time, 72);
             AddRow(results, best, 30);
-            AddRow(results, TwoColumns(SpeedCard("Entry speed", entry), SpeedCard("Exit speed", exit)), 61);
-            AddRow(results, SectionHeading("Recent attempts"), 36);
+            AddRow(results, TwoColumns(SpeedCard("Entry speed", entry), SpeedCard("Exit speed", exit)), 70);
+            AddRow(results, SectionHeading("Recent attempts"), 40);
             var historySurface = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             historySurface.Controls.Add(history);
-            emptyHistory.ForeColor = Muted;
+            emptyHistory.ForeColor = Theme.Muted;
             emptyHistory.TextAlign = ContentAlignment.TopLeft;
             emptyHistory.Padding = new Padding(0, 12, 0, 0);
             historySurface.Controls.Add(emptyHistory);
@@ -205,13 +200,17 @@ internal static partial class RepeatCorner
         private Control BuildFooter()
         {
             var footer = Stack(1);
-            footer.BackColor = Surface;
-            footer.Padding = new Padding(18, 0, 18, 0);
-            var keys = Caption("Ctrl+Shift+J  Retry     ·     Ctrl+Shift+K  Mark start     ·     Ctrl+Shift+L  Mark finish     ·     F9  Stop loop", 9);
-            AddRow(footer, keys, 25);
-            detail.ForeColor = Muted;
-            detail.TextAlign = ContentAlignment.TopLeft;
-            AddRow(footer, detail, 32);
+            footer.BackColor = Theme.Surface;
+            footer.Padding = new Padding(18, 6, 18, 0);
+            var keys = new KeyHints(
+                new[] { "Ctrl+Shift+J", "Retry" }, new[] { "Ctrl+Shift+K", "Mark start" },
+                new[] { "Ctrl+Shift+L", "Mark finish" }, new[] { "F9", "Stop loop" })
+            {
+                Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9)
+            };
+            AddRow(footer, keys, 28);
+            detail.ForeColor = Theme.Muted;
+            AddRow(footer, detail, 28);
             return footer;
         }
 
@@ -231,36 +230,35 @@ internal static partial class RepeatCorner
             var available = displayed.AvailableSaves;
             using (var dialog = new Form
             {
-                Text = "Pin a Free Practice save", BackColor = Surface, ForeColor = TextColor,
-                Font = Font, ClientSize = new Size(495, 193), FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = "Pin a Free Practice save", BackColor = Theme.Surface, ForeColor = Theme.Text,
+                Font = Font, ClientSize = new Size(495, 205), FormBorderStyle = FormBorderStyle.FixedDialog,
                 StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
                 ShowInTaskbar = false
             })
             {
+                Theme.UseDarkTitleBar(dialog);
                 dialog.SuspendLayout();
                 var body = Stack(1);
-                body.Padding = new Padding(18, 13, 18, 10);
-                var saves = Picker("Free Practice save");
-                saves.Dock = DockStyle.Fill;
+                body.Padding = new Padding(18, 13, 12, 10);
+                var saves = new DarkPicker("Free Practice save") { Dock = DockStyle.Fill };
                 saves.Items.AddRange(available.Select(save => (object)((save.Row + 1) + ". " + save.Label)).ToArray());
                 if (available.Length != 0) saves.SelectedIndex = 0;
                 var name = new TextBox
                 {
                     Dock = DockStyle.Fill, AccessibleName = "Checkpoint name", MaxLength = 64,
-                    BackColor = Inset, ForeColor = TextColor
+                    BackColor = Theme.Inset, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle,
+                    Margin = new Padding(0, 4, 6, 4)
                 };
-                var accept = ActionButton("Pin checkpoint");
+                var accept = new PillButton("Pin checkpoint") { Primary = true, Enabled = false };
                 accept.DialogResult = DialogResult.OK;
-                accept.BackColor = Red;
-                accept.Enabled = false;
-                var cancel = ActionButton("Cancel");
+                var cancel = new PillButton("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;
                 name.TextChanged += (source, change) => accept.Enabled = name.Text.Trim().Length != 0 && saves.SelectedIndex >= 0;
                 AddRow(body, SectionHeading("Free Practice save"), 25);
-                AddRow(body, saves, 36);
-                AddRow(body, SectionHeading("Checkpoint name"), 27);
-                AddRow(body, name, 40);
-                AddRow(body, TwoColumns(cancel, accept), 36);
+                AddRow(body, saves, 38);
+                AddRow(body, SectionHeading("Checkpoint name"), 30);
+                AddRow(body, name, 38);
+                AddRow(body, TwoColumns(cancel, accept), 40);
                 dialog.Controls.Add(body);
                 dialog.AcceptButton = accept;
                 dialog.CancelButton = cancel;
@@ -278,7 +276,7 @@ internal static partial class RepeatCorner
 
         private void ToggleLoop(object sender, EventArgs args)
         {
-            string command = displayed.LoopArmed ? "off" : "on " + (int)delay.Value;
+            string command = displayed.LoopArmed ? "off" : "on " + delay.Value;
             session.Post(() => ConfigureLoop(command));
         }
 
@@ -298,12 +296,13 @@ internal static partial class RepeatCorner
             {
                 SetActions(false);
                 status.Text = "Repeat Corner could not start";
+                status.ForeColor = Theme.Amber;
                 detail.Text = view.Error;
                 return;
             }
 
             connection.Text = view.Connected ? "●  ACC connected" : "○  Waiting for ACC";
-            connection.ForeColor = view.Connected ? Green : Muted;
+            connection.ForeColor = view.Connected ? Theme.Green : Theme.Muted;
             if (checkpoint.Items.Count == 0 || !pinNames.SequenceEqual(view.PinNames))
             {
                 pinNames = view.PinNames;
@@ -319,12 +318,15 @@ internal static partial class RepeatCorner
             checkpointDetail.Text = view.CheckpointDetail;
             start.Text = "Start   " + FormatMarker(view.Start);
             finish.Text = "Finish   " + FormatMarker(view.Finish);
+            start.ForeColor = view.Start.HasValue ? Theme.Text : Theme.Muted;
+            finish.ForeColor = view.Finish.HasValue ? Theme.Text : Theme.Muted;
             status.Text = view.Status;
-            status.ForeColor = view.LoopArmed && !view.Reloading ? Green : TextColor;
+            status.ForeColor = view.LoopArmed && !view.Reloading ? Theme.Green : Theme.Text;
             detail.Text = string.IsNullOrEmpty(view.ShortcutWarning) ? view.Detail : view.ShortcutWarning;
-            wheel.Text = view.LearningWheel ? "Waiting for a button press…" : view.Wheel == null ? "Wheel unbound" :
+            detail.ForeColor = string.IsNullOrEmpty(view.ShortcutWarning) ? Theme.Muted : Theme.Amber;
+            wheel.Text = view.LearningWheel ? "Press a wheel button now…" : view.Wheel == null ? "No wheel button bound" :
                 "Button " + (view.Wheel.Button + 1) + " · " + view.Wheel.Device;
-            bindButton.Text = view.LearningWheel ? "Cancel" : "Bind wheel";
+            bindButton.Text = view.LearningWheel ? "Cancel" : view.Wheel == null ? "Bind wheel" : "Rebind";
             loopButton.Text = view.LoopArmed ? "Disarm loop" : "Arm loop";
             SetActions(!view.Reloading);
             RenderResults(view);
@@ -334,9 +336,15 @@ internal static partial class RepeatCorner
         {
             checkpoint.Enabled = bindButton.Enabled = enabled;
             pinButton.Enabled = enabled && displayed.AvailableSaves.Length != 0;
-            clearWheel.Enabled = enabled && displayed.Wheel != null;
+            bool wheelBound = displayed != null && displayed.Wheel != null && !displayed.LearningWheel;
+            clearWheel.Enabled = enabled && wheelBound;
+            if (clearWheel.Visible != wheelBound)
+            {
+                clearWheel.Visible = wheelBound;
+                wheelRow.ColumnStyles[1] = wheelBound ? new ColumnStyle(SizeType.Percent, 50) : new ColumnStyle(SizeType.Absolute, 0);
+            }
             loopButton.Enabled = enabled && (displayed.CanArm || displayed.LoopArmed);
-            loopButton.BackColor = loopButton.Enabled && !displayed.LoopArmed ? Red : Inset;
+            loopButton.Primary = displayed == null || !displayed.LoopArmed;
             delay.Enabled = enabled && !displayed.LoopArmed;
         }
 
@@ -344,29 +352,28 @@ internal static partial class RepeatCorner
         {
             var last = view.Recent.FirstOrDefault();
             time.Text = last == null ? "—" : last.Seconds.ToString("0.000") + " s";
+            time.ForeColor = last == null ? Theme.Faint : IsBest(last, view.Best) ? Theme.Green : Theme.Text;
             entry.Text = last == null ? "—" : FormatSpeed(last.EntrySpeed);
             exit.Text = last == null ? "—" : FormatSpeed(last.ExitSpeed);
             string personalBest = view.Best == null ? "Personal best   —" : string.Format("Personal best   {0:0.000} s", view.Best.Seconds);
             best.Text = personalBest;
+            best.ForeColor = Theme.Muted;
             if (last != null && last.PreviousBestDelta.HasValue)
+            {
                 best.Text = string.Format("{0:+0.000;-0.000;0.000} s vs previous best   ·   {1}", last.PreviousBestDelta.Value, personalBest);
+                best.ForeColor = Theme.Green;
+            }
             else if (last != null && view.Best != null && !IsBest(last, view.Best))
+            {
                 best.Text = string.Format("{0:+0.000;-0.000;0.000} s off best   ·   {1}", last.Seconds - view.Best.Seconds, personalBest);
-            best.ForeColor = IsBest(last, view.Best) ? Green : Muted;
+                best.ForeColor = Theme.Amber;
+            }
+            else if (IsBest(last, view.Best))
+                best.ForeColor = Theme.Green;
 
             if (!displayedAttempts.SequenceEqual(view.Recent) || displayedBest != view.Best)
             {
-                history.Rows.Clear();
-                for (int index = 0; index < view.Recent.Length; index++)
-                {
-                    var run = view.Recent[index];
-                    string label = index == 0 ? "Latest" : (index + 1).ToString();
-                    bool personalRecord = IsBest(run, view.Best);
-                    int row = history.Rows.Add(label + (personalRecord ? " · PB" : ""),
-                        run.Seconds.ToString("0.000") + " s", FormatSpeed(run.EntrySpeed), FormatSpeed(run.ExitSpeed));
-                    if (personalRecord) history.Rows[row].DefaultCellStyle.ForeColor = Green;
-                }
-                history.ClearSelection();
+                history.SetRuns(view.Recent, view.Best);
                 displayedAttempts = view.Recent;
                 displayedBest = view.Best;
             }
@@ -374,6 +381,7 @@ internal static partial class RepeatCorner
             history.Visible = hasAttempts;
             emptyHistory.Visible = !hasAttempts;
             emptyHistory.Text = view.Finish.HasValue ? "Cross both timing markers to record a run." :
+                view.Start.HasValue ? "In ACC, press Ctrl+Shift+L after the exit to mark the finish." :
                 "In ACC, mark the start with Ctrl+Shift+K and the finish with Ctrl+Shift+L.";
         }
 
@@ -413,11 +421,11 @@ internal static partial class RepeatCorner
         private static Control SpeedCard(string name, Label value)
         {
             var card = Stack(1);
-            card.BackColor = Inset;
-            card.Margin = new Padding(0, 3, 9, 0);
-            card.Padding = new Padding(10, 3, 7, 2);
-            card.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
-            card.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
+            card.BackColor = Theme.Surface;
+            card.Margin = new Padding(0, 4, 12, 4);
+            card.Padding = new Padding(12, 5, 8, 3);
+            card.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
+            card.RowStyles.Add(new RowStyle(SizeType.Percent, 62));
             card.Controls.Add(SectionHeading(name), 0, 0);
             card.Controls.Add(value, 0, 1);
             return card;
@@ -428,65 +436,19 @@ internal static partial class RepeatCorner
             return new Label
             {
                 Text = text, Font = new Font("Segoe UI", size), Dock = DockStyle.Fill,
-                ForeColor = TextColor, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty,
+                ForeColor = Theme.Text, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty,
                 AutoEllipsis = true, UseMnemonic = false
             };
         }
 
         private static Label SectionHeading(string text)
         {
-            var label = Caption(text.ToUpperInvariant(), 9);
-            label.ForeColor = Muted;
+            var label = Caption(text.ToUpperInvariant(), 8.5f);
+            label.Font = new Font("Segoe UI Semibold", 8.5f);
+            label.ForeColor = Theme.Muted;
+            label.TextAlign = ContentAlignment.BottomLeft;
+            label.Padding = new Padding(0, 0, 0, 5);
             return label;
-        }
-
-        private static Button ActionButton(string text)
-        {
-            var button = new Button
-            {
-                Text = text, Dock = DockStyle.Fill, BackColor = Inset, ForeColor = TextColor,
-                FlatStyle = FlatStyle.Flat, Margin = new Padding(0, 1, 4, 1), UseVisualStyleBackColor = false
-            };
-            button.FlatAppearance.BorderSize = 0;
-            return button;
-        }
-
-        private static ComboBox Picker(string name)
-        {
-            return new ComboBox
-            {
-                AccessibleName = name, DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Inset, ForeColor = TextColor, FlatStyle = FlatStyle.Flat
-            };
-        }
-
-        private static DataGridView CreateHistory()
-        {
-            var grid = new DataGridView
-            {
-                AccessibleName = "Recent attempts", Dock = DockStyle.Fill, ReadOnly = true,
-                AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
-                AllowUserToResizeColumns = false, RowHeadersVisible = false, MultiSelect = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, BorderStyle = BorderStyle.None,
-                BackgroundColor = Background, GridColor = Inset, EnableHeadersVisualStyles = false,
-                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
-                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-                ColumnHeadersHeight = 27
-            };
-            grid.RowTemplate.Height = 27;
-            grid.DefaultCellStyle = new DataGridViewCellStyle
-            {
-                BackColor = Background, ForeColor = TextColor, SelectionBackColor = Inset, SelectionForeColor = TextColor
-            };
-            grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Surface, ForeColor = Muted };
-            grid.Columns.Add("run", "Run");
-            grid.Columns.Add("time", "Time");
-            grid.Columns.Add("entry", "Entry");
-            grid.Columns.Add("exit", "Exit");
-            foreach (DataGridViewColumn column in grid.Columns)
-                column.SortMode = DataGridViewColumnSortMode.NotSortable;
-            return grid;
         }
     }
 }
