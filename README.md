@@ -64,11 +64,18 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 & '.\bin\ACC Repeat Corner.exe'
 ```
 
-Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, timing, attempt history, and the loop countdown without opening ACC.
+Run `.\Build.ps1 -Test` to check checkpoint identity, wheel button decoding, timing, attempt history, the loop countdown, and menu layout without opening ACC.
 
 ## Compatibility
 
-The prototype uses the English menu layout from ACC 1.10.4. The executable accepts 2880 × 1800 and 1440 × 900 ACC windows. The full retry loop was verified at 2880 × 1800 in solo Free Practice.
+The tool uses English menus from ACC 1.10.4 and detects the ACC window's client size on each retry.
+
+| Aspect ratio | Supported client sizes |
+| --- | --- |
+| 16:9 | 1920 × 1080 (1080p), 2560 × 1440 (1440p) |
+| 16:10 | 1440 × 900, 2880 × 1800 |
+
+If you change resolution during a retry, start a new retry from the practice session once ACC has finished applying the change.
 
 ## Troubleshooting
 
