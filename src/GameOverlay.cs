@@ -140,6 +140,8 @@ internal static partial class RepeatCorner
             string personalBest = view.Best == null ? null : "PB " + view.Best.Seconds.ToString("0.000");
             string footer = string.Join("   ·   ", new[] { loop, personalBest }.Where(part => part != null).ToArray());
 
+            if (view.FindingMarkers)
+                return new[] { "FINDING MARKERS", "Drive the corner", "", "Brake and exit as usual", "amber", "text", "" };
             if (!view.Start.HasValue)
                 return new[] { "TIMING", "Mark start", "", "Ctrl+Shift+K just before braking", "red", "text", "" };
             if (!view.Finish.HasValue)
