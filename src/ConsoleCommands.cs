@@ -38,7 +38,7 @@ internal static partial class RepeatCorner
                     case "checkpoints": PrintCheckpoints(); break;
                     case "wheel": ConfigureWheel(args); break;
                     case "section": PrintSections(); break;
-                    case "history": PrintHistory(); break;
+                    case "history": ConfigureHistory(args); break;
                     case "loop": ConfigureLoop(args); break;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
@@ -71,6 +71,8 @@ internal static partial class RepeatCorner
         Console.WriteLine("wheel                  Show the wheel binding");
         Console.WriteLine("section                Show timing markers for the active drill");
         Console.WriteLine("history                Show the personal best and last five runs");
+        Console.WriteLine("history remove <1-5>   Remove a run you don't want counted (numbers from 'history')");
+        Console.WriteLine("history remove best    Remove the personal best");
         Console.WriteLine("loop on [seconds]      Enable auto-retry after a timed finish (default 3 seconds)");
         Console.WriteLine("loop off               Disable auto-retry");
         Console.WriteLine("loop                   Show the current loop status");
