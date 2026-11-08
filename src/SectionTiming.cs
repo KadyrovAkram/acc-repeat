@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -16,6 +17,8 @@ internal static partial class RepeatCorner
         public string Checkpoint, Track;
         public double Start;
         public double? Finish;
+        public List<Attempt> RecentAttempts = new List<Attempt>();
+        public Attempt BestAttempt;
     }
 
     private static void TryMarkSection(bool start)
@@ -45,7 +48,7 @@ internal static partial class RepeatCorner
                 double span = SectionTimer.ForwardDistance(section.Start, frame.Position);
                 if (span < 0.0002 || span >= 0.5)
                     throw new InvalidOperationException("Mark the finish further ahead on this section.");
-                section.Finish = frame.Position;
+                SetFinish(section, frame.Position);
             }
             StoreSettings();
             timer.Reset();
@@ -94,9 +97,7 @@ internal static partial class RepeatCorner
         var sectionOnTrack = frame == null ? null : CurrentSection(frame.Track);
         var result = timer.Observe(sectionOnTrack, frame);
         if (result != null)
-            Console.WriteLine("Section{0}: {1:0.00} s | Entry {2:0} km/h | Exit {3:0} km/h",
-                sectionOnTrack.Checkpoint == null ? "" : " " + sectionOnTrack.Checkpoint,
-                result.Seconds, result.EntrySpeed, result.ExitSpeed);
+            ReportAttempt(sectionOnTrack, result);
     }
 
     private static MemoryMappedViewAccessor OpenPage(string name, int size)
@@ -154,11 +155,6 @@ internal static partial class RepeatCorner
         private double? startTime;
         private double entrySpeed;
 
-        public sealed class Result
-        {
-            public double Seconds, EntrySpeed, ExitSpeed;
-        }
-
         public void Reset()
         {
             previous = null;
@@ -171,7 +167,7 @@ internal static partial class RepeatCorner
             return delta < 0 ? delta + 1 : delta;
         }
 
-        public Result Observe(Section active, TelemetryFrame current)
+        public Attempt Observe(Section active, TelemetryFrame current)
         {
             if (active != section || active == null || !active.Finish.HasValue || current == null)
                 Reset();
@@ -211,7 +207,7 @@ internal static partial class RepeatCorner
             double duration = before.Time + seconds * exitFraction - startTime.Value;
             startTime = null;
             if (duration <= 0) return null;
-            return new Result
+            return new Attempt
             {
                 Seconds = duration, EntrySpeed = entrySpeed,
                 ExitSpeed = before.Speed + (current.Speed - before.Speed) * exitFraction
