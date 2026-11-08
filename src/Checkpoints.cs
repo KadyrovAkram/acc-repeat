@@ -36,6 +36,11 @@ internal static partial class RepeatCorner
         {
             return Slot == other.Slot && Created == other.Created && Track == other.Track;
         }
+
+        public bool MatchesPin(Checkpoint pin)
+        {
+            return pin != null && Slot == pin.Slot && Created == pin.Created && Track == pin.Track;
+        }
     }
 
     private static void LoadSettings()
@@ -45,6 +50,29 @@ internal static partial class RepeatCorner
             : new ToolSettings();
         if (settings == null || settings.Checkpoints == null || settings.Sections == null)
             throw new InvalidOperationException("RepeatCorner.settings.json is invalid.");
+        CollapseDuplicatePins();
+    }
+
+    private static void CollapseDuplicatePins()
+    {
+        var groups = settings.Checkpoints.GroupBy(pin => new { pin.Slot, pin.Created, pin.Track }).ToArray();
+        var active = FindCheckpoint(settings.ActiveCheckpoint);
+        foreach (var group in groups.Where(group => group.Count() > 1))
+        {
+            var names = group.Select(pin => pin.Name).ToArray();
+            var sections = settings.Sections.Where(section => section.Checkpoint != null &&
+                names.Contains(section.Checkpoint, StringComparer.OrdinalIgnoreCase)).ToArray();
+            // Older versions let separate drills share a save. Preserve pins that each have timing data.
+            if (sections.Select(section => section.Checkpoint).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+                continue;
+
+            var keep = group.Contains(active) ? active : group.Last();
+            foreach (var section in sections)
+                section.Checkpoint = keep.Name;
+            settings.Checkpoints.RemoveAll(pin => pin != keep && group.Contains(pin));
+            if (keep == active)
+                settings.ActiveCheckpoint = keep.Name;
+        }
     }
 
     private static void StoreSettings()
@@ -115,7 +143,7 @@ internal static partial class RepeatCorner
     private static Save SelectSave(Save[] saves, Checkpoint pin)
     {
         var selected = pin == null ? saves.FirstOrDefault() :
-            saves.FirstOrDefault(save => save.Slot == pin.Slot && save.Created == pin.Created && save.Track == pin.Track);
+            saves.FirstOrDefault(save => save.MatchesPin(pin));
         if (selected == null)
             throw new InvalidOperationException(pin == null ? "Create a Free Practice save in ACC first." :
                 "The save for '" + pin.Name + "' was removed or replaced. Select another pin or choose Latest save.");
@@ -151,16 +179,33 @@ internal static partial class RepeatCorner
 
     private static void PinCheckpoint(Save[] saves, Save selected, string name)
     {
-        name = name.Trim();
-        if (name.Length == 0 || FindCheckpoint(name) != null)
-            throw new InvalidOperationException("Choose a new, non-empty checkpoint name.");
-        var pin = new Checkpoint { Name = name, Slot = selected.Slot, Created = selected.Created, Track = selected.Track };
-        SelectSave(saves, pin);
-        settings.Checkpoints.Add(pin);
-        settings.ActiveCheckpoint = name;
+        SetCheckpointName(saves, selected, name);
         StoreSettings();
         DisableLoop("the active checkpoint changed");
-        ReportStatus("Active checkpoint: " + name);
+        ReportStatus("Active checkpoint: " + settings.ActiveCheckpoint);
+    }
+
+    private static void SetCheckpointName(Save[] saves, Save selected, string name)
+    {
+        name = name.Trim();
+        var named = FindCheckpoint(name);
+        if (name.Length == 0 || (named != null && !selected.MatchesPin(named)))
+            throw new InvalidOperationException("Choose a non-empty name that isn't used by another save.");
+
+        var active = FindCheckpoint(settings.ActiveCheckpoint);
+        var existing = named ?? (selected.MatchesPin(active) ? active : settings.Checkpoints.LastOrDefault(selected.MatchesPin));
+        var pin = existing ?? new Checkpoint { Name = name, Slot = selected.Slot, Created = selected.Created, Track = selected.Track };
+        SelectSave(saves, pin);
+        if (existing == null)
+            settings.Checkpoints.Add(pin);
+        else
+        {
+            foreach (var section in settings.Sections.Where(section =>
+                string.Equals(section.Checkpoint, pin.Name, StringComparison.OrdinalIgnoreCase)))
+                section.Checkpoint = name;
+            pin.Name = name;
+        }
+        settings.ActiveCheckpoint = name;
     }
 
     private static void UseCheckpoint(string name)
