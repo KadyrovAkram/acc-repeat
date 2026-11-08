@@ -28,7 +28,7 @@ internal static partial class RepeatCorner
 
     private sealed class Save
     {
-        public string Slot, Created, Label, Mode, Track;
+        public string Slot, Created, Label, Mode, Track, TrackDisplayName;
         public int Row;
 
         public bool SameSave(Save other)
@@ -80,13 +80,15 @@ internal static partial class RepeatCorner
         DateTime parsed;
         if (!DateTime.TryParseExact(created, "yyyy.MM.dd-HH.mm.ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             throw new InvalidOperationException("Could not read the date of ACC save " + Path.GetFileName(path) + ".");
+        string trackDisplayName = Convert.ToString(data["trackDisplayName"]);
         return new Save
         {
             Slot = Path.GetFileNameWithoutExtension(path).TrimEnd('H'),
             Created = created,
             Mode = Convert.ToString(data["gameMode"]),
             Track = Convert.ToString(data["trackName"]),
-            Label = Convert.ToString(data["trackDisplayName"]) + " (" + created + ")"
+            TrackDisplayName = trackDisplayName,
+            Label = trackDisplayName + " (" + created + ")"
         };
     }
 
@@ -95,7 +97,7 @@ internal static partial class RepeatCorner
         if (string.IsNullOrEmpty(settings.ActiveCheckpoint)) return null;
         var pin = FindCheckpoint(settings.ActiveCheckpoint);
         if (pin == null)
-            throw new InvalidOperationException("The active pin is missing. Type 'latest' or select another pin.");
+            throw new InvalidOperationException("The active pin is missing. Choose Latest save or select another pin.");
         return pin;
     }
 
@@ -115,7 +117,7 @@ internal static partial class RepeatCorner
             saves.FirstOrDefault(save => save.Slot == pin.Slot && save.Created == pin.Created && save.Track == pin.Track);
         if (selected == null)
             throw new InvalidOperationException(pin == null ? "Create a Free Practice save in ACC first." :
-                "The save for '" + pin.Name + "' was removed or replaced. Select another pin or type 'latest'.");
+                "The save for '" + pin.Name + "' was removed or replaced. Select another pin or choose Latest save.");
         if (selected.Mode != "Practice")
             throw new InvalidOperationException("Retry requires a Free Practice save.");
         if (selected.Row >= VisibleSaveRows)
@@ -143,15 +145,21 @@ internal static partial class RepeatCorner
         var saves = ReadSaves();
         if (number < 1 || number > Math.Min(VisibleSaveRows, saves.Length) || saves[number - 1].Mode != "Practice")
             throw new InvalidOperationException("Choose a visible Free Practice save.");
-        string name = parts[1].Trim();
+        PinCheckpoint(saves, saves[number - 1], parts[1]);
+    }
+
+    private static void PinCheckpoint(Save[] saves, Save selected, string name)
+    {
+        name = name.Trim();
         if (name.Length == 0 || FindCheckpoint(name) != null)
             throw new InvalidOperationException("Choose a new, non-empty checkpoint name.");
-        var save = saves[number - 1];
-        settings.Checkpoints.Add(new Checkpoint { Name = name, Slot = save.Slot, Created = save.Created, Track = save.Track });
+        var pin = new Checkpoint { Name = name, Slot = selected.Slot, Created = selected.Created, Track = selected.Track };
+        SelectSave(saves, pin);
+        settings.Checkpoints.Add(pin);
         settings.ActiveCheckpoint = name;
         StoreSettings();
         DisableLoop("the active checkpoint changed");
-        Console.WriteLine("Active checkpoint: " + name);
+        ReportStatus("Active checkpoint: " + name);
     }
 
     private static void UseCheckpoint(string name)
@@ -162,7 +170,7 @@ internal static partial class RepeatCorner
         settings.ActiveCheckpoint = pin.Name;
         StoreSettings();
         DisableLoop("the active checkpoint changed");
-        Console.WriteLine("Active checkpoint: " + pin.Name);
+        ReportStatus("Active checkpoint: " + pin.Name);
     }
 
     private static void UseLatest()
@@ -170,7 +178,7 @@ internal static partial class RepeatCorner
         settings.ActiveCheckpoint = null;
         StoreSettings();
         DisableLoop("the active checkpoint changed");
-        Console.WriteLine("Retry will use the newest Free Practice save.");
+        ReportStatus("Retry will use the newest save if it is from Free Practice.");
     }
 
     private static void PrintCheckpoints()

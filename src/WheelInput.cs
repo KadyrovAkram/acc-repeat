@@ -26,9 +26,9 @@ internal static partial class RepeatCorner
                 found |= previousButtons[slot].HasValue;
             }
             if (!found)
-                throw new InvalidOperationException("Windows did not report a joystick or wheel. Connect it and try 'wheel bind' again.");
+                throw new InvalidOperationException("Windows did not report a joystick or wheel. Connect it and try again.");
             learnWheel = Stopwatch.StartNew();
-            Console.WriteLine("Release any held buttons, then press your Retry button within 15 seconds.");
+            ReportStatus("Release any held buttons, then press your Retry button within 15 seconds.");
         }
         else if (action.Equals("clear", StringComparison.OrdinalIgnoreCase))
         {
@@ -36,7 +36,7 @@ internal static partial class RepeatCorner
             StoreSettings();
             learnWheel = null;
             wheelArmed = false;
-            Console.WriteLine("Wheel binding cleared.");
+            ReportStatus("Wheel binding cleared.");
         }
         else if (action.Length == 0)
         {
@@ -70,7 +70,7 @@ internal static partial class RepeatCorner
         if (learnWheel.Elapsed.TotalSeconds >= 15)
         {
             learnWheel = null;
-            Console.WriteLine("No new button press detected. Type 'wheel bind' to try again.");
+            ReportStatus("No new button press detected. Try binding the wheel again.");
             return;
         }
         for (int slot = 0; slot < WheelSlots; slot++)
@@ -90,12 +90,12 @@ internal static partial class RepeatCorner
             try
             {
                 StoreSettings();
-                Console.WriteLine("Retry bound to {0}, button {1}.", device, newBinding.Button + 1);
+                ReportStatus(string.Format("Retry bound to {0}, button {1}.", device, newBinding.Button + 1));
             }
             catch (Exception error)
             {
                 settings.Wheel = oldBinding;
-                Console.WriteLine("Could not store the wheel binding: " + error.Message);
+                ReportStatus("Could not store the wheel binding. " + error.Message);
             }
             learnWheel = null;
             wheelArmed = false;

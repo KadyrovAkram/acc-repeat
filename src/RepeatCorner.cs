@@ -18,8 +18,10 @@ internal static partial class RepeatCorner
     private static bool diagnostics;
     private static string stage;
     private static bool reloadInProgress;
+    private static bool reloadWaitingForFocus;
     private static double reloadTimeAway;
     private static int reloadFocusVersion;
+    private static DesktopSession desktopSession;
 
     private static double ReloadTime { get { return sectionClock.Elapsed.TotalSeconds - reloadTimeAway; } }
 
@@ -33,39 +35,57 @@ internal static partial class RepeatCorner
             PrintSaves();
             return 0;
         }
+        return RunEngine(null);
+    }
 
+    private static int RunEngine(DesktopSession desktop)
+    {
         bool exists;
         using (var instance = new Mutex(true, @"Local\ACCRepeatCorner", out exists))
         {
             if (!exists)
             {
-                Console.WriteLine("ACC Repeat Corner is already running.");
+                const string message = "ACC Repeat Corner is already running. Close the other instance and reopen this one.";
+                if (desktop == null) Console.WriteLine(message);
+                else desktop.Fail(message);
                 return 1;
             }
             if (!RegisterHotKey(IntPtr.Zero, 1, 0x4006, 0x4A))
             {
-                Console.WriteLine("Ctrl+Shift+J is already in use. Press Enter to close.");
-                Console.ReadLine();
+                const string message = "Ctrl+Shift+J is already in use.";
+                if (desktop == null)
+                {
+                    Console.WriteLine(message + " Press Enter to close.");
+                    Console.ReadLine();
+                }
+                else desktop.Fail(message + " Free the shortcut and reopen Repeat Corner.");
                 return 1;
             }
             bool startKey = RegisterHotKey(IntPtr.Zero, 2, 0x4006, 0x4B);
             bool finishKey = RegisterHotKey(IntPtr.Zero, 3, 0x4006, 0x4C);
 
+            desktopSession = desktop;
             try
             {
-                Console.Title = "ACC Repeat Corner";
                 LoadSettings();
-                Console.WriteLine("Ctrl+Shift+J: retry the selected Practice save while ACC is focused.");
-                Console.WriteLine("Ctrl+Shift+K / Ctrl+Shift+L: mark the section start / finish.");
-                if (!startKey || !finishKey)
-                    Console.WriteLine("One or more section hotkeys are already in use.");
-                Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
-                Console.WriteLine("English ACC menus: 1080p, 1440p, 1440 x 900, or 2880 x 1800.");
-                Console.WriteLine("Type 'help' for console commands.");
-                Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
-                StartConsoleInput();
+                if (desktop == null)
+                {
+                    Console.Title = "ACC Repeat Corner";
+                    Console.WriteLine("Ctrl+Shift+J: retry the selected Practice save while ACC is focused.");
+                    Console.WriteLine("Ctrl+Shift+K / Ctrl+Shift+L: mark the section start / finish.");
+                    if (!startKey || !finishKey)
+                        Console.WriteLine("One or more section hotkeys are already in use.");
+                    Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
+                    Console.WriteLine("English ACC menus: 1080p, 1440p, 1440 x 900, or 2880 x 1800.");
+                    Console.WriteLine("Type 'help' for console commands.");
+                    Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
+                    StartConsoleInput();
+                }
+                else
+                    desktop.Initialize(startKey, finishKey);
+
                 Message message;
-                while (ProcessConsoleInput())
+                while (desktop == null ? ProcessConsoleInput() : desktop.ProcessCommands())
                 {
                     if (PeekMessage(out message, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1))
                     {
@@ -77,6 +97,7 @@ internal static partial class RepeatCorner
                     PollWheel();
                     PollSection();
                     PollLoop();
+                    if (desktop != null) desktop.Publish();
                     Thread.Sleep(15);
                 }
             }
@@ -86,9 +107,16 @@ internal static partial class RepeatCorner
                 UnregisterHotKey(IntPtr.Zero, 1);
                 if (startKey) UnregisterHotKey(IntPtr.Zero, 2);
                 if (finishKey) UnregisterHotKey(IntPtr.Zero, 3);
+                desktopSession = null;
             }
         }
         return 0;
+    }
+
+    private static void ReportStatus(string message)
+    {
+        Console.WriteLine(message);
+        if (desktopSession != null) desktopSession.Note(message);
     }
 
     private static void EnableDpiAwareness()
@@ -114,10 +142,14 @@ internal static partial class RepeatCorner
         try { Retry(keyboard, expected); }
         catch (Exception error)
         {
-            Console.WriteLine("Stopped while " + stage + ": " + error.Message);
             DisableLoop("retry stopped");
+            ReportStatus("Stopped while " + stage + ". " + error.Message);
         }
-        finally { reloadInProgress = false; }
+        finally
+        {
+            reloadWaitingForFocus = false;
+            reloadInProgress = false;
+        }
         wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
@@ -190,7 +222,7 @@ internal static partial class RepeatCorner
                 throw new InvalidOperationException("The Drive menu did not close.");
             Thread.Sleep(100);
         }
-        Console.WriteLine("Drive resumed after " + (ReloadTime - started).ToString("0.0") + " seconds of reload time.");
+        ReportStatus("Drive resumed after " + (ReloadTime - started).ToString("0.0") + " seconds of reload time.");
     }
 
     private static int PracticeStatus()
@@ -371,6 +403,8 @@ internal static partial class RepeatCorner
 
     private static void EnsureGame()
     {
+        CheckDesktopClosing();
+        if (desktopSession != null) desktopSession.Publish();
         if (IsDown(0x78))
             throw new OperationCanceledException("Cancelled with F9.");
         if (GetForegroundWindow() != game)
@@ -397,15 +431,24 @@ internal static partial class RepeatCorner
 
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
 
+    private static void CheckDesktopClosing()
+    {
+        if (desktopSession != null && desktopSession.IsClosing)
+            throw new OperationCanceledException("Repeat Corner is closing.");
+    }
+
     private static void WaitForReloadFocus()
     {
         Console.WriteLine("Reload paused. Switch back to ACC to continue, or press F9 to cancel.");
+        reloadWaitingForFocus = true;
+        if (desktopSession != null) desktopSession.Publish(true);
         double awaySince = sectionClock.Elapsed.TotalSeconds;
         reloadFocusVersion++;
         // Fullscreen ACC may briefly report a different client size while it restores the display mode.
         double focusedSince = -1;
         while (true)
         {
+            CheckDesktopClosing();
             if (IsDown(0x78)) throw new OperationCanceledException("Cancelled with F9.");
             if (!IsWindow(game)) throw new InvalidOperationException("ACC closed during the reload.");
             if (GetForegroundWindow() == game)
@@ -422,6 +465,7 @@ internal static partial class RepeatCorner
             Thread.Sleep(25);
         }
         reloadTimeAway += sectionClock.Elapsed.TotalSeconds - awaySince;
+        reloadWaitingForFocus = false;
         Console.WriteLine("ACC focused. Checking the menu before continuing.");
     }
 
@@ -454,6 +498,7 @@ internal static partial class RepeatCorner
                         WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
                         cursor == point && !IsDown(0x01) && !IsDown(0x02))
                     {
+                        CheckDesktopClosing();
                         SendClick(point);
                         return;
                     }

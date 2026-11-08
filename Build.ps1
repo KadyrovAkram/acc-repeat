@@ -1,4 +1,4 @@
-param([switch]$Test)
+param([switch]$Test, [switch]$Console)
 
 $ErrorActionPreference = 'Stop'
 
@@ -15,14 +15,21 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter 
     ForEach-Object { $_.FullName })
 
 $target = $exe
-$entryPoint = 'RepeatCorner'
+$entryPoint = 'PracticeDeskApp'
+$targetKind = 'winexe'
+if ($Console) {
+    $target = Join-Path $bin 'ACC Repeat Corner - Console.exe'
+    $entryPoint = 'RepeatCorner'
+    $targetKind = 'exe'
+}
 if ($Test) {
     $target = Join-Path $bin 'PracticeDrillTests.exe'
     $entryPoint = 'PracticeDrillTests'
+    $targetKind = 'exe'
     $sources += Join-Path $PSScriptRoot 'tests/PracticeDrillTests.cs'
 }
 
-& $compiler /nologo /optimize+ /platform:x64 /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/reference:$speech" "/out:$target" "/main:$entryPoint" @sources
+& $compiler /nologo /optimize+ /platform:x64 "/target:$targetKind" /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll "/reference:$speech" "/out:$target" "/main:$entryPoint" @sources
 if ($LASTEXITCODE -ne 0) {
     throw "C# compiler exited with code $LASTEXITCODE."
 }
@@ -31,5 +38,5 @@ if ($Test) {
     & $target
     if ($LASTEXITCODE -ne 0) { throw 'Practice drill checks failed.' }
 } else {
-    Write-Output $exe
+    Write-Output $target
 }

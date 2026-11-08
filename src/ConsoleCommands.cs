@@ -26,8 +26,8 @@ internal static partial class RepeatCorner
             string[] parts = line.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) continue;
             string args = parts.Length == 2 ? parts[1].Trim() : "";
-            string original = Json.Serialize(settings);
-            try
+            if (parts[0].Equals("quit", StringComparison.OrdinalIgnoreCase)) return false;
+            ApplyCommand(() =>
             {
                 switch (parts[0].ToLowerInvariant())
                 {
@@ -40,18 +40,23 @@ internal static partial class RepeatCorner
                     case "section": PrintSections(); break;
                     case "history": PrintHistory(); break;
                     case "loop": ConfigureLoop(args); break;
-                    case "quit": return false;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
                 }
-            }
-            catch (Exception error)
-            {
-                settings = Json.Deserialize<ToolSettings>(original);
-                Console.WriteLine(error.Message);
-            }
+            });
         }
         return true;
+    }
+
+    private static void ApplyCommand(Action command)
+    {
+        string original = Json.Serialize(settings);
+        try { command(); }
+        catch (Exception error)
+        {
+            settings = Json.Deserialize<ToolSettings>(original);
+            ReportStatus(error.Message);
+        }
     }
 
     private static void PrintHelp()
