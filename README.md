@@ -11,6 +11,16 @@ Practice the same corner or sequence in Assetto Corsa Competizione without drivi
 
 The newest entry in **Saved Games** must be the Free Practice checkpoint you want to repeat. Save earlier on the approach if you need more room to settle the car after loading.
 
+## Screenshots
+
+Use **Save** in the Free Practice pause menu to create a checkpoint.
+
+![ACC paused on track at Monza with Save and Drive available](docs/images/practice-checkpoint.png)
+
+On retry, the tool selects **Play** on the top row of **Saved Games** and then selects **Drive** when the session loads.
+
+![ACC Saved Games screen with the latest Monza practice save highlighted](docs/images/saved-games.png)
+
 ## Build on Windows
 
 Run the following from the repository root in PowerShell. The build uses the 64-bit .NET Framework 4.x compiler installed with Windows.
