@@ -108,8 +108,11 @@ internal static partial class RepeatCorner
 
     private static Save SelectSave()
     {
-        var saves = ReadSaves();
-        var pin = ActiveCheckpoint();
+        return SelectSave(ReadSaves(), ActiveCheckpoint());
+    }
+
+    private static Save SelectSave(Save[] saves, Checkpoint pin)
+    {
         var selected = pin == null ? saves.FirstOrDefault() :
             saves.FirstOrDefault(save => save.Slot == pin.Slot && save.Created == pin.Created && save.Track == pin.Track);
         if (selected == null)
