@@ -53,13 +53,13 @@ internal static partial class RepeatCorner
             StoreSettings();
             timer.Reset();
             DisableLoop("timing markers changed");
-            Console.WriteLine(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
+            ReportStatus(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
                 "Timing finish marked. Retry and cross both marks to record a run.");
         }
         catch (Exception error)
         {
             settings = Json.Deserialize<ToolSettings>(original);
-            Console.WriteLine("Could not mark section: " + error.Message);
+            ReportStatus("Could not mark section. " + error.Message);
         }
     }
 

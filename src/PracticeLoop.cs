@@ -41,8 +41,8 @@ internal static partial class RepeatCorner
         CancelLoopCountdown();
         loopSave = save;
         loopDelay = delay;
-        Console.WriteLine("Hands-free loop enabled for {0}. Auto-retry starts {1} s after the result callout. Tap F9 to turn it off.",
-            settings.ActiveCheckpoint ?? save.Label, delay);
+        ReportStatus(string.Format("Hands-free loop armed for {0}. Auto-retry starts {1} s after the result callout.",
+            settings.ActiveCheckpoint ?? save.Label, delay));
     }
 
     private static void StartLoopCountdown(Section section, Attempt attempt)
@@ -139,7 +139,7 @@ internal static partial class RepeatCorner
         if (loopSave == null) return;
         loopSave = null;
         CancelLoopCountdown();
-        Console.WriteLine("Hands-free loop off (" + reason + ").");
+        ReportStatus("Hands-free loop off (" + reason + ").");
     }
 
     private static void CancelLoopCountdown()
@@ -161,7 +161,7 @@ internal static partial class RepeatCorner
         catch (Exception error)
         {
             voiceUnavailable = true;
-            Console.WriteLine("Voice unavailable. Using the console countdown. " + error.Message);
+            ReportStatus("Voice unavailable. The countdown will continue. " + error.Message);
             return null;
         }
     }
@@ -182,6 +182,7 @@ internal static partial class RepeatCorner
         private int lastTick = -1;
 
         public bool IsSuspended { get { return suspendedAt.HasValue; } }
+        public int RemainingSeconds { get { return lastTick; } }
 
         public LoopCountdown(double now, int delay)
         {
