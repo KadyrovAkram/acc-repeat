@@ -38,6 +38,7 @@ internal static partial class RepeatCorner
                     case "checkpoints": PrintCheckpoints(); break;
                     case "wheel": ConfigureWheel(args); break;
                     case "section": PrintSections(); break;
+                    case "history": PrintHistory(); break;
                     case "quit": return false;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
@@ -63,6 +64,7 @@ internal static partial class RepeatCorner
         Console.WriteLine("wheel clear            Remove the wheel binding");
         Console.WriteLine("wheel                  Show the wheel binding");
         Console.WriteLine("section                Show timing markers for the active drill");
+        Console.WriteLine("history                Show the personal best and last five runs");
         Console.WriteLine("quit                   Close the tool");
     }
 }
