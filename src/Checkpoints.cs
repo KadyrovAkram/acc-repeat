@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 
@@ -11,6 +12,8 @@ internal static partial class RepeatCorner
     private const int VisibleSaveRows = 5;
     private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
     private static readonly string SettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RepeatCorner.settings.json");
+    private static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        "Assetto Corsa Competizione", "Savegames");
     private static ToolSettings settings = new ToolSettings();
 
     public sealed class ToolSettings
@@ -87,12 +90,10 @@ internal static partial class RepeatCorner
 
     private static Save[] ReadSaves()
     {
-        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "Assetto Corsa Competizione", "Savegames");
-        if (!Directory.Exists(folder))
+        if (!Directory.Exists(SaveDirectory))
             return new Save[0];
 
-        var saves = Directory.EnumerateFiles(folder, "*H.json")
+        var saves = Directory.EnumerateFiles(SaveDirectory, "*H.json")
             .Where(path => Regex.IsMatch(Path.GetFileName(path), @"^[0-9]+H\.json$"))
             .Select(ReadSave)
             .OrderByDescending(save => save.Created, StringComparer.Ordinal)
@@ -100,6 +101,49 @@ internal static partial class RepeatCorner
         for (int row = 0; row < saves.Length; row++)
             saves[row].Row = row;
         return saves;
+    }
+
+    private sealed class SavedRaceState
+    {
+        public SavedCarState[] CarStates { get; set; }
+    }
+
+    private sealed class SavedCarState
+    {
+        public SavedCarCache CarCache { get; set; }
+    }
+
+    private sealed class SavedCarCache
+    {
+        public double? LerpSplinePosition { get; set; }
+    }
+
+    private static double? ReadLoadPosition(string path)
+    {
+        try
+        {
+            using (var file = File.OpenRead(path))
+            {
+                // ACC can write the race state in UTF-16 LE without a byte-order mark.
+                file.ReadByte();
+                var encoding = file.ReadByte() == 0 ? Encoding.Unicode : Encoding.UTF8;
+                file.Position = 0;
+                using (var reader = new StreamReader(file, encoding))
+                {
+                    var state = Json.Deserialize<SavedRaceState>(reader.ReadToEnd());
+                    // Repeat Corner works with solo practice. A single car makes the saved position unambiguous.
+                    if (state == null || state.CarStates == null || state.CarStates.Length != 1) return null;
+                    var car = state.CarStates[0];
+                    double? position = car == null || car.CarCache == null ? null : car.CarCache.LerpSplinePosition;
+                    return position >= 0 && position <= 1 ? position : null;
+                }
+            }
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+        catch (ArgumentException) { return null; }
+        catch (InvalidOperationException) { return null; }
+        catch (FormatException) { return null; }
     }
 
     private static Save ReadSave(string path)

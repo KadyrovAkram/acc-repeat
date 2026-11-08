@@ -45,6 +45,8 @@ Instead of pressing the shortcuts at the right moment, select **Place on map…*
 
 Scroll over a corner to zoom toward it, or use **+** and **−**. While zoomed in, drag with the right mouse button to move around. **Fit** shows the whole circuit again.
 
+The amber **Load** diamond shows where your selected checkpoint places the car on the circuit.
+
 Repeat Corner includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
 
 Use **Import map…** to load a custom Race Element ACC `.bin` for the selected track, keeping its original filename. If you have no map for that track, you can draw one by driving a lap with ACC focused and Repeat Corner open. Imported and recorded maps are saved in `RepeatCorner.maps.json` beside the executable.
