@@ -36,6 +36,7 @@ internal static partial class RepeatCorner
                     case "use": UseCheckpoint(args); break;
                     case "latest": UseLatest(); break;
                     case "checkpoints": PrintCheckpoints(); break;
+                    case "wheel": ConfigureWheel(args); break;
                     case "quit": return false;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
@@ -57,6 +58,9 @@ internal static partial class RepeatCorner
         Console.WriteLine("checkpoints            List pins and show the active checkpoint");
         Console.WriteLine("use <name>             Activate a named checkpoint");
         Console.WriteLine("latest                 Switch back to the newest save");
+        Console.WriteLine("wheel bind             Learn the next wheel or controller button you press");
+        Console.WriteLine("wheel clear            Remove the wheel binding");
+        Console.WriteLine("wheel                  Show the wheel binding");
         Console.WriteLine("quit                   Close the tool");
     }
 }

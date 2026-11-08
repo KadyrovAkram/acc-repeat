@@ -58,6 +58,7 @@ internal static partial class RepeatCorner
                 {
                     if (PeekMessage(out message, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1))
                         TryRetry(true);
+                    PollWheel();
                     Thread.Sleep(15);
                 }
             }
@@ -71,6 +72,7 @@ internal static partial class RepeatCorner
         if (!FindGame()) return;
         try { Retry(keyboard); }
         catch (Exception error) { Console.WriteLine("Stopped while " + stage + ": " + error.Message); }
+        wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
     }
