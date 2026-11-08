@@ -96,6 +96,7 @@ internal static partial class RepeatCorner
             {
                 using (var dialog = new MarkerMapDialog(session, displayed, Font)) dialog.ShowDialog(this);
             };
+            history.RemoveRequested += ConfirmRemove;
             refreshTimer.Tick += (sender, args) =>
             {
                 var view = session.Snapshot;
@@ -305,6 +306,16 @@ internal static partial class RepeatCorner
                     session.Post(() => PinCheckpoint(ReadSaves(), selected, newName));
                 }
             }
+        }
+
+        private void ConfirmRemove(Attempt run)
+        {
+            bool isBest = displayed != null && displayed.Best != null && displayed.Best.Seconds == run.Seconds;
+            string question = string.Format("Remove the {0:0.000} s run from your history?{1}\n\nThis can't be undone.",
+                run.Seconds, isBest ? " It's your personal best; the quickest run left in the list becomes your best." : "");
+            if (MessageBox.Show(this, question, "Remove run", MessageBoxButtons.OKCancel, MessageBoxIcon.None,
+                MessageBoxDefaultButton.Button2) == DialogResult.OK)
+                session.Post(() => RemoveRun(run));
         }
 
         private void ToggleLoop(object sender, EventArgs args)

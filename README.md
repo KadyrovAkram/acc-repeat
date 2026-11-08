@@ -53,7 +53,11 @@ History is stored with the timing markers in `RepeatCorner.settings.json`. Chang
 
 The tool measures how far the car actually drove between the markers. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut. The run isn't added to your history or personal best. The Practice desk says by how much it was short, the in-game overlay shows **Cut · not counted** with the run's time until your next run, and in a loop the voice says "Cut. Not counted." before retrying.
 
-ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first run on a new pair of markers has nothing to compare against, so it's always recorded.
+ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track-limits verdict. The check only catches shortcuts, such as straight-lining a chicane. Running wide isn't flagged, because it only makes the run slower. The first runs on a new pair of markers have nothing to compare against, so they're always recorded. Once three runs have a measured distance, the tool applies the same check to the runs already in your history, including your personal best, and removes the cuts. It does this after each run and when it starts.
+
+### Remove a run
+
+To remove a run you don't want counted, hover over it in **Recent attempts** and select the **×** at the end of the row, then confirm. If your personal best has dropped out of the last five runs, it gets its own **Best** row so you can remove it too. When you remove your best, the quickest run left in the list becomes your best. Removing a run can't be undone. In the console version, use `history remove <1-5>` or `history remove best`.
 
 ### Run a hands-free loop
 

@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -298,11 +299,16 @@ internal static partial class RepeatCorner
         }
     }
 
-    // Recent runs with a bar showing how far each run was from the personal best.
+    // Recent runs with a bar showing how far each run was from the personal best. Hovering a
+    // row shows a remove button; a best that dropped out of the recent list gets its own row.
     private sealed class AttemptList : Control
     {
-        private Attempt[] runs = new Attempt[0];
+        private Attempt[] runs = new Attempt[0], rows = new Attempt[0];
         private Attempt best;
+        private int hoverRow = -1;
+        private bool hoverRemove;
+        private float paintScale = 1;
+        public event Action<Attempt> RemoveRequested;
 
         public AttemptList()
         {
@@ -319,6 +325,9 @@ internal static partial class RepeatCorner
         {
             runs = recent;
             best = personalBest;
+            bool bestListed = personalBest == null || recent.Any(IsPersonalBest);
+            rows = bestListed ? recent : recent.Concat(new[] { personalBest }).ToArray();
+            hoverRow = -1;
             var lines = new string[recent.Length];
             for (int index = 0; index < recent.Length; index++)
                 lines[index] = string.Format("{0}: {1:0.000} seconds, {2}", RunLabel(index), recent[index].Seconds,
@@ -327,7 +336,49 @@ internal static partial class RepeatCorner
             Invalidate();
         }
 
-        private static string RunLabel(int index) { return index == 0 ? "Latest" : "Run " + (index + 1); }
+        private string RunLabel(int index)
+        {
+            return index >= runs.Length ? "Best" : index == 0 ? "Latest" : "Run " + (index + 1);
+        }
+
+        private int RowHeight { get { return (int)(38 * paintScale); } }
+        private int HeaderHeight { get { return (int)(30 * paintScale); } }
+
+        private RectangleF RemoveBox(int row)
+        {
+            float size = 26 * paintScale;
+            return new RectangleF(Width - size - 6 * paintScale, HeaderHeight + row * RowHeight + (RowHeight - size) / 2f, size, size);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int row = e.Y < HeaderHeight ? -1 : (e.Y - HeaderHeight) / RowHeight;
+            if (row >= rows.Length) row = -1;
+            bool overRemove = row >= 0 && RemoveBox(row).Contains(e.Location);
+            if (row != hoverRow || overRemove != hoverRemove)
+            {
+                hoverRow = row;
+                hoverRemove = overRemove;
+                Cursor = overRemove ? Cursors.Hand : Cursors.Default;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            hoverRow = -1;
+            hoverRemove = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            base.OnMouseClick(e);
+            if (e.Button == MouseButtons.Left && hoverRemove && hoverRow >= 0 && RemoveRequested != null)
+                RemoveRequested(rows[hoverRow]);
+        }
 
         private bool IsPersonalBest(Attempt run) { return best != null && run.Seconds == best.Seconds; }
 
@@ -340,9 +391,10 @@ internal static partial class RepeatCorner
         {
             var graphics = e.Graphics;
             float scale = Theme.Scale(graphics);
+            paintScale = scale;
             graphics.Clear(BackColor);
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            int rowHeight = (int)(38 * scale), headerHeight = (int)(30 * scale);
+            int rowHeight = RowHeight, headerHeight = HeaderHeight;
             float[] widths = { 0.17f, 0.18f, 0.35f, 0.15f, 0.15f };
             var columns = new int[widths.Length + 1];
             for (int index = 0; index < widths.Length; index++)
@@ -362,9 +414,9 @@ internal static partial class RepeatCorner
                 foreach (var run in runs)
                     if (best != null) spread = Math.Max(spread, run.Seconds - best.Seconds);
 
-                for (int row = 0; row < runs.Length; row++)
+                for (int row = 0; row < rows.Length; row++)
                 {
-                    var run = runs[row];
+                    var run = rows[row];
                     int top = headerHeight + row * rowHeight;
                     bool personalBest = IsPersonalBest(run);
                     if (row == 0)
@@ -377,7 +429,19 @@ internal static partial class RepeatCorner
                     Cell(graphics, FormatSpeed(run.EntrySpeed), Font, Theme.Muted, columns, 3, top, rowHeight);
                     Cell(graphics, FormatSpeed(run.ExitSpeed), Font, Theme.Muted, columns, 4, top, rowHeight);
                     graphics.DrawLine(line, 0, top + rowHeight - 1, Width, top + rowHeight - 1);
+                    if (row == hoverRow) PaintRemove(graphics, RemoveBox(row), scale);
                 }
+            }
+        }
+
+        private void PaintRemove(Graphics graphics, RectangleF box, float scale)
+        {
+            Theme.FillRounded(graphics, hoverRemove ? Theme.Red : Theme.Inset, box, 5 * scale);
+            float inset = box.Width * 0.34f;
+            using (var pen = new Pen(Theme.Text, 1.6f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                graphics.DrawLine(pen, box.Left + inset, box.Top + inset, box.Right - inset, box.Bottom - inset);
+                graphics.DrawLine(pen, box.Right - inset, box.Top + inset, box.Left + inset, box.Bottom - inset);
             }
         }
 

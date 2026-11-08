@@ -42,6 +42,100 @@ internal static partial class RepeatCorner
         return shorter > Math.Max(CutMinimumMetres, usual * CutFraction) ? shorter : (double?)null;
     }
 
+    // The first runs on new markers have nothing to compare against, so a cut can be
+    // recorded, even as the personal best. Once three runs have a measured distance, the
+    // same check is applied to every recorded run and the cuts are dropped.
+    private static int PruneCuts(Section section)
+    {
+        var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
+        if (paths.Length < 3) return 0;
+        double usual = paths[paths.Length / 2];
+        Func<Attempt, bool> isCut = run => run.Path > 0 && usual - run.Path > Math.Max(CutMinimumMetres, usual * CutFraction);
+        var cuts = section.RecentAttempts.Where(isCut).ToList();
+        bool bestIsCut = section.BestAttempt != null && isCut(section.BestAttempt);
+        int removed = cuts.Count + (bestIsCut && !cuts.Any(run => SameRun(run, section.BestAttempt)) ? 1 : 0);
+        section.RecentAttempts.RemoveAll(run => cuts.Contains(run));
+        if (bestIsCut) section.BestAttempt = QuickestRecent(section);
+        return removed;
+    }
+
+    private static void PruneAllCuts()
+    {
+        int removed = settings.Sections.Sum(section => PruneCuts(section));
+        if (removed == 0) return;
+        StoreSettings();
+        ReportStatus(string.Format("Removed {0} earlier run{1} that look like cuts.", removed, removed == 1 ? "" : "s"));
+    }
+
+    private static bool SameRun(Attempt left, Attempt right)
+    {
+        return left == right || (left.Seconds == right.Seconds && left.EntrySpeed == right.EntrySpeed &&
+            left.ExitSpeed == right.ExitSpeed && left.Path == right.Path);
+    }
+
+    private static Attempt QuickestRecent(Section section)
+    {
+        return section.RecentAttempts.OrderBy(run => run.Seconds).FirstOrDefault();
+    }
+
+    // Removes one run the driver doesn't want counted. A removed personal best is replaced by
+    // the quickest run left in the recent list; an older best that already dropped out is gone.
+    private static void RemoveAttempt(Section section, Attempt run)
+    {
+        bool wasBest = DropAttempt(section, run);
+        StoreSettings();
+        ReportStatus(string.Format("Removed the {0:0.000} s run.{1}", run.Seconds, !wasBest ? "" :
+            section.BestAttempt == null ? " No personal best left." :
+            string.Format(" Your best is now {0:0.000} s.", section.BestAttempt.Seconds)));
+    }
+
+    // Returns whether the removed run was the personal best.
+    private static bool DropAttempt(Section section, Attempt run)
+    {
+        bool wasBest = section.BestAttempt != null && SameRun(section.BestAttempt, run);
+        int index = section.RecentAttempts.FindIndex(recent => SameRun(recent, run));
+        if (index < 0 && !wasBest)
+            throw new InvalidOperationException("That run is no longer in the history.");
+        if (index >= 0) section.RecentAttempts.RemoveAt(index);
+        if (wasBest) section.BestAttempt = QuickestRecent(section);
+        return wasBest;
+    }
+
+    // Desk: the run object comes from the snapshot, which shares the engine's instances.
+    private static void RemoveRun(Attempt run)
+    {
+        var section = settings.Sections.Find(candidate => candidate.Checkpoint == settings.ActiveCheckpoint &&
+            (candidate.RecentAttempts.Contains(run) || candidate.BestAttempt == run));
+        if (section == null)
+            throw new InvalidOperationException("That run is no longer in the history.");
+        RemoveAttempt(section, run);
+    }
+
+    // Console: 'history remove <1-5>' or 'history remove best' for the active drill.
+    private static void ConfigureHistory(string arguments)
+    {
+        var parts = arguments.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            PrintHistory();
+            return;
+        }
+        int number = 0;
+        bool best = parts.Length == 2 && parts[1].Equals("best", StringComparison.OrdinalIgnoreCase);
+        if (parts.Length != 2 || !parts[0].Equals("remove", StringComparison.OrdinalIgnoreCase) ||
+            (!best && (!int.TryParse(parts[1], out number) || number < 1 || number > RecentAttemptLimit)))
+            throw new InvalidOperationException("Use 'history', 'history remove <1-5>' or 'history remove best'.");
+        var sections = settings.Sections.Where(section => section.Checkpoint == settings.ActiveCheckpoint &&
+            (section.RecentAttempts.Count != 0 || section.BestAttempt != null)).ToArray();
+        if (sections.Length != 1)
+            throw new InvalidOperationException(sections.Length == 0 ? "There are no runs to remove." :
+                "This drill has runs on more than one track. Pin a checkpoint for the track first.");
+        var target = sections[0];
+        if (best && target.BestAttempt == null) throw new InvalidOperationException("There is no personal best.");
+        if (!best && number > target.RecentAttempts.Count) throw new InvalidOperationException("There is no run " + number + ".");
+        RemoveAttempt(target, best ? target.BestAttempt : target.RecentAttempts[number - 1]);
+    }
+
     private static void SetFinish(Section section, double position)
     {
         if (section.Finish != position)
@@ -79,7 +173,14 @@ internal static partial class RepeatCorner
         bool newBest = !delta.HasValue || delta.Value < 0;
         Console.WriteLine("{0}: {1}{2}{3}", section.Checkpoint ?? section.Track,
             DescribeAttempt(attempt), comparison, newBest ? " | New best" : "");
-        if (desktopSession != null) desktopSession.Note(string.Format("Run recorded: {0:0.00} s.", attempt.Seconds));
+        int pruned = PruneCuts(section);
+        string note = string.Format("Run recorded: {0:0.00} s.", attempt.Seconds);
+        if (pruned != 0)
+        {
+            note += string.Format(" Removed {0} earlier run{1} that look like cuts.", pruned, pruned == 1 ? "" : "s");
+            Console.WriteLine(note);
+        }
+        if (desktopSession != null) desktopSession.Note(note);
 
         try { StoreSettings(); }
         catch (IOException error) { ReportStatus("Could not save attempt history. " + error.Message); }

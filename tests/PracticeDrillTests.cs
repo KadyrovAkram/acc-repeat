@@ -75,6 +75,7 @@ internal static partial class RepeatCorner
 
         VerifyCutDetection();
         VerifyTrackMap();
+        VerifyRunRemoval();
         VerifyAttemptHistory(result);
         VerifyCheckpointRename();
         VerifyLoopCountdown();
@@ -253,6 +254,42 @@ internal static partial class RepeatCorner
         var restored = Json.Deserialize<System.Collections.Generic.List<TrackMap>>(Json.Serialize(new[] { half }));
         Require(restored.Count == 1 && restored[0].Filled.Count(filled => filled) == MapBins / 2 &&
             restored[0].X[10] == half.X[10], "A track map failed to round-trip.");
+    }
+
+    private static void VerifyRunRemoval()
+    {
+        // Two cuts recorded first, while there was nothing to compare against.
+        var section = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
+        foreach (var run in new[]
+        {
+            new Attempt { Seconds = 28.9, Path = 811 }, new Attempt { Seconds = 28.7, Path = 812 },
+            new Attempt { Seconds = 29.1, Path = 810 }, new Attempt { Seconds = 27.4, Path = 789 },
+            new Attempt { Seconds = 27.6, Path = 791 }
+        })
+            RecordAttempt(section, run);
+        Require(section.BestAttempt.Seconds == 27.4, "Setup: the cut should be the recorded best.");
+        Require(PruneCuts(section) == 2 && section.RecentAttempts.Count == 3 && section.BestAttempt.Seconds == 28.7,
+            "Earlier cut runs were not removed once the usual line was known.");
+        Require(PruneCuts(section) == 0, "Clean runs were removed as cuts.");
+
+        // A best restored from the settings file is a separate object with the same values.
+        section.BestAttempt = Json.Deserialize<Attempt>(Json.Serialize(section.BestAttempt));
+        Require(DropAttempt(section, section.RecentAttempts.Find(run => run.Seconds == 28.7)) &&
+            section.BestAttempt.Seconds == 28.9 && section.RecentAttempts.Count == 2,
+            "Removing the personal best did not promote the next quickest run.");
+        Require(!DropAttempt(section, section.RecentAttempts.Find(run => run.Seconds == 29.1)) &&
+            section.BestAttempt.Seconds == 28.9, "Removing a slower run changed the personal best.");
+        try
+        {
+            DropAttempt(section, new Attempt { Seconds = 30 });
+            throw new Exception("Removing a run that isn't in the history was accepted.");
+        }
+        catch (InvalidOperationException) { }
+
+        var legacy = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
+        foreach (double seconds in new[] { 29.0, 27.0, 28.0, 28.5 }) RecordAttempt(legacy, new Attempt { Seconds = seconds });
+        Require(PruneCuts(legacy) == 0 && legacy.RecentAttempts.Count == 4,
+            "Runs without a measured distance were removed as cuts.");
     }
 
     private static void VerifyCutDetection()
