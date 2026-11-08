@@ -47,6 +47,14 @@ You can switch windows with Alt+Tab or your touchpad to check results. A pending
 
 Press **F9** in ACC or select **Disarm loop** to turn the loop off. Press your wheel button or **Ctrl+Shift+J** to retry early and keep looping. The loop starts off each time you launch the tool. Switching checkpoints, changing the markers, or leaving the practice session turns it off during a countdown.
 
+## In-game overlay
+
+While ACC is focused, a small panel over the game shows the live section time, your last run with its gap to your personal best, and the loop countdown. Choose where it sits, or turn it off, under **In-game overlay** on the Practice desk.
+
+![The overlay showing a 28.912 s run, +0.495 s off the personal best, with the auto-retry countdown](docs/images/overlay.png)
+
+The overlay ignores the mouse and never takes focus. It hides itself while a retry reloads the checkpoint, so it can't get in the way of the menu checks. Run ACC in borderless or windowed mode; exclusive full-screen mode draws over every other window.
+
 ## Screenshots
 
 Use **Save** in the Free Practice pause menu to create a checkpoint.
