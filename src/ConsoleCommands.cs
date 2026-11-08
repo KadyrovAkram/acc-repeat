@@ -39,6 +39,7 @@ internal static partial class RepeatCorner
                     case "wheel": ConfigureWheel(args); break;
                     case "section": PrintSections(); break;
                     case "history": PrintHistory(); break;
+                    case "loop": ConfigureLoop(args); break;
                     case "quit": return false;
                     case "help": PrintHelp(); break;
                     default: Console.WriteLine("Unknown command. Type 'help' for commands."); break;
@@ -65,6 +66,9 @@ internal static partial class RepeatCorner
         Console.WriteLine("wheel                  Show the wheel binding");
         Console.WriteLine("section                Show timing markers for the active drill");
         Console.WriteLine("history                Show the personal best and last five runs");
+        Console.WriteLine("loop on [seconds]      Enable auto-retry after a timed finish (default 3 seconds)");
+        Console.WriteLine("loop off               Disable auto-retry");
+        Console.WriteLine("loop                   Show the current loop status");
         Console.WriteLine("quit                   Close the tool");
     }
 }

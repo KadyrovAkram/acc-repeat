@@ -53,7 +53,7 @@ internal static partial class RepeatCorner
                 Console.WriteLine("Ctrl+Shift+K / Ctrl+Shift+L: mark the section start / finish.");
                 if (!startKey || !finishKey)
                     Console.WriteLine("One or more section hotkeys are already in use.");
-                Console.WriteLine("Hold F9 to cancel a retry. Close this window to stop the tool.");
+                Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
                 Console.WriteLine("Prototype layout: 2880 x 1800 or 1440 x 900, English menus.");
                 Console.WriteLine("Type 'help' for console commands.");
                 Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
@@ -70,11 +70,13 @@ internal static partial class RepeatCorner
                     }
                     PollWheel();
                     PollSection();
+                    PollLoop();
                     Thread.Sleep(15);
                 }
             }
             finally
             {
+                if (loopVoice != null) loopVoice.Dispose();
                 UnregisterHotKey(IntPtr.Zero, 1);
                 if (startKey) UnregisterHotKey(IntPtr.Zero, 2);
                 if (finishKey) UnregisterHotKey(IntPtr.Zero, 3);
@@ -83,18 +85,23 @@ internal static partial class RepeatCorner
         return 0;
     }
 
-    private static void TryRetry(bool keyboard)
+    private static void TryRetry(bool keyboard, Save expected = null)
     {
         if (!FindGame()) return;
+        CancelLoopCountdown();
         timer.Reset();
-        try { Retry(keyboard); }
-        catch (Exception error) { Console.WriteLine("Stopped while " + stage + ": " + error.Message); }
+        try { Retry(keyboard, expected); }
+        catch (Exception error)
+        {
+            Console.WriteLine("Stopped while " + stage + ": " + error.Message);
+            DisableLoop("retry stopped");
+        }
         wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
     }
 
-    private static void Retry(bool keyboard)
+    private static void Retry(bool keyboard, Save expected)
     {
         var elapsed = Stopwatch.StartNew();
         stage = "waiting for the shortcut keys to be released";
@@ -107,6 +114,10 @@ internal static partial class RepeatCorner
         }
         stage = "checking the practice save";
         var checkpoint = SelectSave();
+        if (expected != null && !expected.SameSave(checkpoint))
+            throw new InvalidOperationException("The selected save changed. Enable the loop again for the new save.");
+        if (loopSave != null && !loopSave.SameSave(checkpoint))
+            DisableLoop("the selected save changed");
         Console.WriteLine("Retrying " + checkpoint.Label + "...");
         int status = PracticeStatus();
         if (status != 2 && status != 3)

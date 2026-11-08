@@ -152,6 +152,7 @@ internal static partial class RepeatCorner
         settings.Checkpoints.Add(new Checkpoint { Name = name, Slot = save.Slot, Created = save.Created, Track = save.Track });
         settings.ActiveCheckpoint = name;
         StoreSettings();
+        DisableLoop("the active checkpoint changed");
         Console.WriteLine("Active checkpoint: " + name);
     }
 
@@ -162,6 +163,7 @@ internal static partial class RepeatCorner
             throw new InvalidOperationException("Unknown checkpoint. Type 'checkpoints' to list names.");
         settings.ActiveCheckpoint = pin.Name;
         StoreSettings();
+        DisableLoop("the active checkpoint changed");
         Console.WriteLine("Active checkpoint: " + pin.Name);
     }
 
@@ -169,6 +171,7 @@ internal static partial class RepeatCorner
     {
         settings.ActiveCheckpoint = null;
         StoreSettings();
+        DisableLoop("the active checkpoint changed");
         Console.WriteLine("Retry will use the newest Free Practice save.");
     }
 

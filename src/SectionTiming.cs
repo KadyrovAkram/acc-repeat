@@ -52,6 +52,7 @@ internal static partial class RepeatCorner
             }
             StoreSettings();
             timer.Reset();
+            DisableLoop("timing markers changed");
             Console.WriteLine(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
                 "Timing finish marked. Retry and cross both marks to record a run.");
         }
@@ -97,7 +98,10 @@ internal static partial class RepeatCorner
         var sectionOnTrack = frame == null ? null : CurrentSection(frame.Track);
         var result = timer.Observe(sectionOnTrack, frame);
         if (result != null)
+        {
             ReportAttempt(sectionOnTrack, result);
+            StartLoopCountdown(sectionOnTrack, result);
+        }
     }
 
     private static MemoryMappedViewAccessor OpenPage(string name, int size)
