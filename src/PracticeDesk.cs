@@ -27,8 +27,9 @@ internal static partial class RepeatCorner
     private sealed class PracticeDesk : Form
     {
         private readonly DesktopSession session;
-        private readonly Timer refreshTimer = new Timer { Interval = 100 };
+        private readonly Timer refreshTimer = new Timer { Interval = 50 };
         private readonly DarkPicker checkpoint = new DarkPicker("Active checkpoint");
+        private readonly DarkPicker overlayPosition = new DarkPicker("In-game overlay position");
         private readonly PillButton pinButton = new PillButton("Pin a save…");
         private readonly PillButton loopButton = new PillButton("Arm loop");
         private readonly PillButton bindButton = new PillButton("Bind wheel");
@@ -48,6 +49,7 @@ internal static partial class RepeatCorner
         private readonly Label emptyHistory = Caption("Cross both timing markers to record a run.", 10);
         private readonly AttemptList history = new AttemptList { Dock = DockStyle.Fill, Visible = false };
         private TableLayoutPanel wheelRow;
+        private GameOverlay overlay;
         private DeskSnapshot displayed;
         private string[] pinNames = new string[0];
         private Attempt[] displayedAttempts = new Attempt[0];
@@ -84,27 +86,40 @@ internal static partial class RepeatCorner
             ResumeLayout(true);
 
             checkpoint.SelectionChangeCommitted += SelectCheckpoint;
+            overlayPosition.SelectionChangeCommitted += SelectOverlay;
             pinButton.Click += OpenPinDialog;
             loopButton.Click += ToggleLoop;
             bindButton.Click += BindWheel;
             clearWheel.Click += (sender, args) => session.Post(() => ConfigureWheel("clear"));
-            refreshTimer.Tick += (sender, args) => Render(session.Snapshot);
+            refreshTimer.Tick += (sender, args) =>
+            {
+                var view = session.Snapshot;
+                if (overlay != null) overlay.Update(view);
+                Render(view);
+            };
             SetActions(false);
             Shown += (sender, args) =>
             {
+                overlay = new GameOverlay();
                 session.Start();
                 refreshTimer.Start();
             };
             FormClosed += (sender, args) =>
             {
                 refreshTimer.Stop();
+                if (overlay != null) overlay.Dispose();
+                overlay = null;
                 session.Stop();
             };
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) refreshTimer.Dispose();
+            if (disposing)
+            {
+                refreshTimer.Dispose();
+                if (overlay != null) overlay.Dispose();
+            }
             base.Dispose(disposing);
         }
 
@@ -170,6 +185,11 @@ internal static partial class RepeatCorner
             wheelRow = TwoColumns(bindButton, clearWheel);
             AddRow(sidebar, wheelRow, 36);
 
+            AddRow(sidebar, SectionHeading("In-game overlay"), 36);
+            overlayPosition.Dock = DockStyle.Fill;
+            overlayPosition.Items.AddRange(OverlayPositions.Cast<object>().ToArray());
+            overlayPosition.SelectedIndex = 1;
+            AddRow(sidebar, overlayPosition, 36);
             sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             sidebar.Controls.Add(new Panel { Margin = Padding.Empty }, 0, sidebar.RowStyles.Count - 1);
             return sidebar;
@@ -223,6 +243,13 @@ internal static partial class RepeatCorner
                 string name = pinNames[index - 1];
                 session.Post(() => UseCheckpoint(name));
             }
+        }
+
+        private void SelectOverlay(object sender, EventArgs args)
+        {
+            if (overlayPosition.SelectedIndex < 0) return;
+            string position = OverlayPositions[overlayPosition.SelectedIndex];
+            session.Post(() => SetOverlayPosition(position));
         }
 
         private void OpenPinDialog(object sender, EventArgs args)
@@ -315,6 +342,9 @@ internal static partial class RepeatCorner
             int selectedIndex = Array.IndexOf(pinNames, view.ActivePin) + 1;
             if (!checkpoint.DroppedDown && checkpoint.SelectedIndex != selectedIndex)
                 checkpoint.SelectedIndex = selectedIndex;
+            int overlayIndex = Array.IndexOf(OverlayPositions, view.OverlayPosition);
+            if (overlayIndex >= 0 && !overlayPosition.DroppedDown && overlayPosition.SelectedIndex != overlayIndex)
+                overlayPosition.SelectedIndex = overlayIndex;
             checkpointDetail.Text = view.CheckpointDetail;
             start.Text = "Start   " + FormatMarker(view.Start);
             finish.Text = "Finish   " + FormatMarker(view.Finish);
@@ -334,7 +364,7 @@ internal static partial class RepeatCorner
 
         private void SetActions(bool enabled)
         {
-            checkpoint.Enabled = bindButton.Enabled = enabled;
+            checkpoint.Enabled = bindButton.Enabled = overlayPosition.Enabled = enabled;
             pinButton.Enabled = enabled && displayed.AvailableSaves.Length != 0;
             bool wheelBound = displayed != null && displayed.Wheel != null && !displayed.LearningWheel;
             clearWheel.Enabled = enabled && wheelBound;
