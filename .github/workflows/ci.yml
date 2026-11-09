@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build the app and run the tests
+        shell: pwsh
+        run: ./Build.ps1 -Test
+
+      - name: Build the console version
+        shell: pwsh
+        run: ./Build.ps1 -Console
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: acc-repeat-${{ github.sha }}
+          path: |
+            bin/ACC Repeat.exe
+            bin/Maps/

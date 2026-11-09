@@ -3,9 +3,9 @@ using System.Speech.Synthesis;
 
 internal static partial class RepeatCorner
 {
-    private static Save loopSave;
+    internal static Save loopSave;
     private static int loopDelay;
-    private static LoopCountdown countdown;
+    internal static LoopCountdown countdown;
     private static IntPtr loopWindow;
     private static double nextLoopCheck;
     private static double? telemetryMissingSince;
@@ -134,7 +134,7 @@ internal static partial class RepeatCorner
         Console.WriteLine("Auto-reset paused. Return to live driving in ACC to continue.");
     }
 
-    private static void DisableLoop(string reason)
+    internal static void DisableLoop(string reason)
     {
         if (loopSave == null) return;
         loopSave = null;
@@ -142,7 +142,7 @@ internal static partial class RepeatCorner
         ReportStatus("Hands-free loop off (" + reason + ").");
     }
 
-    private static void CancelLoopCountdown()
+    internal static void CancelLoopCountdown()
     {
         if (countdown == null) return;
         countdown = null;
@@ -173,7 +173,7 @@ internal static partial class RepeatCorner
         catch (InvalidOperationException) { }
     }
 
-    private sealed class LoopCountdown
+    internal sealed class LoopCountdown
     {
         private double voiceDeadline;
         private readonly int delay;

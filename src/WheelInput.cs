@@ -103,7 +103,7 @@ internal static partial class RepeatCorner
         }
     }
 
-    private static int ButtonIndex(uint mask)
+    internal static int ButtonIndex(uint mask)
     {
         int index = 0;
         while ((mask >>= 1) != 0) index++;

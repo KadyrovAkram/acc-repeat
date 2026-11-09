@@ -5,7 +5,7 @@ using System.Linq;
 
 internal static partial class RepeatCorner
 {
-    private static readonly string BundledMapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Maps");
+    internal static readonly string BundledMapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Maps");
     private static readonly Dictionary<string, TrackMap> bundledMaps =
         new Dictionary<string, TrackMap>(StringComparer.OrdinalIgnoreCase);
 
@@ -44,7 +44,7 @@ internal static partial class RepeatCorner
         return MapView(track);
     }
 
-    private static TrackMap ReadTrackMapFile(string track, string path)
+    internal static TrackMap ReadTrackMapFile(string track, string path)
     {
         // The binary format has no track ID in its header. Use the original filename.
         if (!SameTrack(Path.GetFileName(path), track + ".bin"))

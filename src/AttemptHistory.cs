@@ -33,7 +33,7 @@ internal static partial class RepeatCorner
             "Looks like a cut.", attempt.Seconds, shortBy));
     }
 
-    private static double? CutMetres(Section section, Attempt attempt)
+    internal static double? CutMetres(Section section, Attempt attempt)
     {
         var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
         if (paths.Length == 0 || attempt.Path <= 0) return null;
@@ -45,7 +45,7 @@ internal static partial class RepeatCorner
     // The first runs on new markers have nothing to compare against, so a cut can be
     // recorded, even as the personal best. Once three runs have a measured distance, the
     // same check is applied to every recorded run and the cuts are dropped.
-    private static int PruneCuts(Section section)
+    internal static int PruneCuts(Section section)
     {
         var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
         if (paths.Length < 3) return 0;
@@ -90,7 +90,7 @@ internal static partial class RepeatCorner
     }
 
     // Returns whether the removed run was the personal best.
-    private static bool DropAttempt(Section section, Attempt run)
+    internal static bool DropAttempt(Section section, Attempt run)
     {
         bool wasBest = section.BestAttempt != null && SameRun(section.BestAttempt, run);
         int index = section.RecentAttempts.FindIndex(recent => SameRun(recent, run));
@@ -136,7 +136,7 @@ internal static partial class RepeatCorner
         RemoveAttempt(target, best ? target.BestAttempt : target.RecentAttempts[number - 1]);
     }
 
-    private static void SetFinish(Section section, double position)
+    internal static void SetFinish(Section section, double position)
     {
         if (section.Finish != position)
         {
@@ -146,7 +146,7 @@ internal static partial class RepeatCorner
         section.Finish = position;
     }
 
-    private static double? RecordAttempt(Section section, Attempt attempt)
+    internal static double? RecordAttempt(Section section, Attempt attempt)
     {
         var previousBest = section.BestAttempt;
         section.RecentAttempts.Insert(0, attempt);

@@ -9,12 +9,12 @@ using System.Web.Script.Serialization;
 
 internal static partial class RepeatCorner
 {
-    private const int VisibleSaveRows = 5;
-    private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
+    internal const int VisibleSaveRows = 5;
+    internal static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
     private static readonly string SettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ACCRepeat.settings.json");
     private static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "Assetto Corsa Competizione", "Savegames");
-    private static ToolSettings settings = new ToolSettings();
+    internal static ToolSettings settings = new ToolSettings();
 
     public sealed class ToolSettings
     {
@@ -30,7 +30,7 @@ internal static partial class RepeatCorner
         public string Name, Slot, Created, Track;
     }
 
-    private sealed class Save
+    internal sealed class Save
     {
         public string Slot, Created, Label, Mode, Track, TrackDisplayName;
         public int Row;
@@ -56,7 +56,7 @@ internal static partial class RepeatCorner
         CollapseDuplicatePins();
     }
 
-    private static void CollapseDuplicatePins()
+    internal static void CollapseDuplicatePins()
     {
         var groups = settings.Checkpoints.GroupBy(pin => new { pin.Slot, pin.Created, pin.Track }).ToArray();
         var active = FindCheckpoint(settings.ActiveCheckpoint);
@@ -103,17 +103,17 @@ internal static partial class RepeatCorner
         return saves;
     }
 
-    private sealed class SavedRaceState
+    internal sealed class SavedRaceState
     {
         public SavedCarState[] CarStates { get; set; }
     }
 
-    private sealed class SavedCarState
+    internal sealed class SavedCarState
     {
         public SavedCarCache CarCache { get; set; }
     }
 
-    private sealed class SavedCarCache
+    internal sealed class SavedCarCache
     {
         public double? LerpSplinePosition { get; set; }
     }
@@ -165,7 +165,7 @@ internal static partial class RepeatCorner
         };
     }
 
-    private static Checkpoint ActiveCheckpoint()
+    internal static Checkpoint ActiveCheckpoint()
     {
         if (string.IsNullOrEmpty(settings.ActiveCheckpoint)) return null;
         var pin = FindCheckpoint(settings.ActiveCheckpoint);
@@ -174,7 +174,7 @@ internal static partial class RepeatCorner
         return pin;
     }
 
-    private static Checkpoint FindCheckpoint(string name)
+    internal static Checkpoint FindCheckpoint(string name)
     {
         return settings.Checkpoints.Find(pin => string.Equals(pin.Name, name, StringComparison.OrdinalIgnoreCase));
     }
@@ -184,7 +184,7 @@ internal static partial class RepeatCorner
         return SelectSave(ReadSaves(), ActiveCheckpoint());
     }
 
-    private static Save SelectSave(Save[] saves, Checkpoint pin)
+    internal static Save SelectSave(Save[] saves, Checkpoint pin)
     {
         var selected = pin == null ? saves.FirstOrDefault() :
             saves.FirstOrDefault(save => save.MatchesPin(pin));
@@ -229,7 +229,7 @@ internal static partial class RepeatCorner
         ReportStatus("Active save: " + settings.ActiveCheckpoint);
     }
 
-    private static void SetCheckpointName(Save[] saves, Save selected, string name)
+    internal static void SetCheckpointName(Save[] saves, Save selected, string name)
     {
         name = name.Trim();
         var named = FindCheckpoint(name);

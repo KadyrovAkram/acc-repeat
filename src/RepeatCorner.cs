@@ -66,6 +66,9 @@ internal static partial class RepeatCorner
             bool finishKey = RegisterHotKey(IntPtr.Zero, 3, 0x4006, 0x4C);
 
             desktopSession = desktop;
+            DiagnosticLog.Started();
+            if (!startKey || !finishKey)
+                DiagnosticLog.Warn("One or more section hotkeys (Ctrl+Shift+K / L) are already in use.");
             try
             {
                 LoadSettings();
@@ -121,7 +124,15 @@ internal static partial class RepeatCorner
     private static void ReportStatus(string message)
     {
         Console.WriteLine(message);
+        DiagnosticLog.Info(message);
         if (desktopSession != null) desktopSession.Note(message);
+    }
+
+    // Every reset step goes through here, so the log shows exactly how far a failed reset got.
+    private static void SetStage(string name)
+    {
+        stage = name;
+        DiagnosticLog.Info("Reset step: " + name + ".");
     }
 
     private static void EnableDpiAwareness()
@@ -138,6 +149,8 @@ internal static partial class RepeatCorner
     {
         if (!FindGame() || (expected != null && game != loopWindow)) return false;
         if (expected != null) Console.WriteLine("Auto-resetting...");
+        DiagnosticLog.Info(expected != null ? "Auto-reset started by the loop." :
+            keyboard ? "Reset started from the keyboard shortcut." : "Reset started from the wheel button.");
         CancelLoopCountdown();
         timer.Reset();
         reloadInProgress = true;
@@ -149,6 +162,7 @@ internal static partial class RepeatCorner
         catch (Exception error)
         {
             DisableLoop("reset stopped");
+            DiagnosticLog.Error("Reset stopped while " + stage + ".", error);
             ReportStatus("Stopped while " + stage + ". " + error.Message);
         }
         finally
@@ -166,7 +180,7 @@ internal static partial class RepeatCorner
     private static void Retry(bool keyboard, Save expected)
     {
         double started = ReloadTime;
-        stage = "waiting for the shortcut keys to be released";
+        SetStage("waiting for the shortcut keys to be released");
         while (keyboard && (IsDown(0x11) || IsDown(0x10) || IsDown(0x4A) || IsDown(0x5B) || IsDown(0x5C)))
         {
             EnsureGame();
@@ -174,19 +188,21 @@ internal static partial class RepeatCorner
                 throw new InvalidOperationException("Release the shortcut keys promptly and try again.");
             Thread.Sleep(20);
         }
-        stage = "checking the practice save";
+        SetStage("checking the practice save");
         var checkpoint = SelectSave();
         if (expected != null && !expected.SameSave(checkpoint))
             throw new InvalidOperationException("The selected save changed. Enable the loop again for the new save.");
         if (loopSave != null && !loopSave.SameSave(checkpoint))
             DisableLoop("the selected save changed");
         Console.WriteLine("Resetting to " + checkpoint.Label + "...");
+        DiagnosticLog.Info(string.Format("Resetting to {0} (track {1}, Saved Games row {2}).",
+            checkpoint.Label, checkpoint.Track, checkpoint.Row + 1));
         EnsureGame();
         if (!Matches(layout.SavedTitle)) ExitPracticeForRetry(checkpoint);
-        stage = "selecting Play on the save's row";
+        SetStage("selecting Play on the save's row");
         Click(CheckpointPlayButton(checkpoint), layout.SavedTitle, checkpoint);
         WaitFor("restored save and Drive button", layout.Pause, 90);
-        stage = "selecting Drive";
+        SetStage("selecting Drive");
         Click(layout.DriveButton, layout.Pause);
         int driveFocusVersion = reloadFocusVersion;
         double driveStarted = ReloadTime;
@@ -222,7 +238,7 @@ internal static partial class RepeatCorner
         if (status != 2 && status != 3)
             throw new InvalidOperationException("Start in solo Free Practice or on the Saved Games screen.");
 
-        stage = "checking the save's Play button";
+        SetStage("checking the save's Play button");
         EnsureGame();
         var play = Point.Add(origin, (Size)layout.ToClient(CheckpointPlayButton(checkpoint)));
         if (GetForegroundWindow() == game && WindowFromPoint(play) != game)
@@ -230,7 +246,7 @@ internal static partial class RepeatCorner
 
         if (status == 2 && !Matches(layout.Pause))
         {
-            stage = "opening the pause menu";
+            SetStage("opening the pause menu");
             EnsureGame();
             if (PracticeStatus() == 2)
             {
@@ -241,10 +257,10 @@ internal static partial class RepeatCorner
         }
 
         WaitFor("Free Practice pause menu", layout.Pause, 3);
-        stage = "selecting Quit";
+        SetStage("selecting Quit");
         Click(layout.QuitButton, layout.Pause);
         WaitFor("Quit confirmation", layout.Confirm, 3);
-        stage = "confirming Quit";
+        SetStage("confirming Quit");
         Click(layout.ConfirmButton, layout.Confirm);
         OpenSavedGames();
     }
@@ -264,7 +280,7 @@ internal static partial class RepeatCorner
         WaitFor("main menu", layout.Home, 45);
         for (int attempt = 1; attempt <= 3; attempt++)
         {
-            stage = "opening Saved Games (attempt " + attempt + " of 3)";
+            SetStage("opening Saved Games (attempt " + attempt + " of 3)");
             Click(layout.SavedGamesButton, layout.Home);
             if (WaitForMenu(layout.SavedTitle, 2)) return;
 
@@ -275,16 +291,21 @@ internal static partial class RepeatCorner
                 return;
             }
             if (attempt < 3)
+            {
                 Console.WriteLine("ACC is still on the main menu. Retrying Saved Games.");
+                DiagnosticLog.Warn("ACC is still on the main menu. Retrying Saved Games.");
+            }
         }
         throw new InvalidOperationException("ACC stayed on the main menu after three Saved Games clicks.");
     }
 
     private static void WaitFor(string name, Signature[] signatures, int seconds)
     {
-        stage = "waiting for " + name;
+        SetStage("waiting for " + name);
+        double started = ReloadTime;
         if (!WaitForMenu(signatures, seconds))
             throw new InvalidOperationException("Could not recognize " + name + ".");
+        DiagnosticLog.Info(string.Format("Recognized {0} after {1:0.00} s.", name, ReloadTime - started));
     }
 
     private static bool WaitForMenu(Signature[] signatures, int seconds)
@@ -327,7 +348,7 @@ internal static partial class RepeatCorner
         return matched;
     }
 
-    private sealed class Signature
+    internal sealed class Signature
     {
         public readonly int X, Y, Width, Height;
         private readonly byte[] mask;
@@ -439,7 +460,10 @@ internal static partial class RepeatCorner
         }
         var size = ReadClientSize(out origin);
         if (layout == null)
+        {
             layout = MenuLayout.Select(size);
+            DiagnosticLog.Info(string.Format("ACC client area {0} x {1} at {2}, {3}.", size.Width, size.Height, origin.X, origin.Y));
+        }
         else if (layout.ClientSize != size)
             throw new InvalidOperationException("The ACC window changed size. Reset again from the practice session.");
     }

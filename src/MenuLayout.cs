@@ -3,7 +3,7 @@ using System.Drawing;
 
 internal static partial class RepeatCorner
 {
-    private sealed class MenuLayout
+    internal sealed class MenuLayout
     {
         public readonly Size ClientSize;
         public readonly int SignaturePadding;
