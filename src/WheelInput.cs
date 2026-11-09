@@ -32,15 +32,15 @@ internal static partial class RepeatCorner
         }
         else if (action.Equals("clear", StringComparison.OrdinalIgnoreCase))
         {
-            settings.Wheel = null;
-            StoreSettings();
+            store.Settings.Wheel = null;
+            store.Save();
             learnWheel = null;
             wheelArmed = false;
             ReportStatus("Wheel binding cleared.");
         }
         else if (action.Length == 0)
         {
-            var binding = settings.Wheel;
+            var binding = store.Settings.Wheel;
             Console.WriteLine(binding == null ? "Wheel is unbound. Type 'wheel bind'." :
                 string.Format("Wheel: {0}, device slot {1}, button {2}.", binding.Device, binding.Slot, binding.Button + 1));
         }
@@ -55,7 +55,7 @@ internal static partial class RepeatCorner
             LearnWheelButton();
             return;
         }
-        var binding = settings.Wheel;
+        var binding = store.Settings.Wheel;
         if (binding == null || binding.Slot < 0 || binding.Slot >= WheelSlots || binding.Button < 0 || binding.Button >= 32)
             return;
         uint? buttons = ReadButtons(binding.Slot);
@@ -84,17 +84,17 @@ internal static partial class RepeatCorner
             string device = ReadDevice(slot);
             if (device == null) continue;
 
-            var oldBinding = settings.Wheel;
+            var oldBinding = store.Settings.Wheel;
             var newBinding = new WheelBinding { Slot = slot, Button = ButtonIndex(rising), Device = device };
-            settings.Wheel = newBinding;
+            store.Settings.Wheel = newBinding;
             try
             {
-                StoreSettings();
+                store.Save();
                 ReportStatus(string.Format("Reset bound to {0}, button {1}.", device, newBinding.Button + 1));
             }
             catch (Exception error)
             {
-                settings.Wheel = oldBinding;
+                store.Settings.Wheel = oldBinding;
                 ReportStatus("Could not store the wheel binding. " + error.Message);
             }
             learnWheel = null;

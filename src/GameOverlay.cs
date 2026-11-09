@@ -23,7 +23,7 @@ internal static partial class RepeatCorner
     {
         try
         {
-            int status = PracticeStatus();
+            int status = game.PracticeStatus();
             return status == 2 || status == 3;
         }
         catch (IOException) { return false; }
@@ -43,8 +43,8 @@ internal static partial class RepeatCorner
     private static void SetOverlayPosition(string position)
     {
         if (!OverlayPositions.Contains(position)) return;
-        settings.Overlay = position;
-        StoreSettings();
+        store.Settings.Overlay = position;
+        store.Save();
         ReportStatus(position == "Off" ? "In-game overlay off." :
             "In-game overlay shown at the " + position.ToLowerInvariant() + " of the ACC window.");
     }

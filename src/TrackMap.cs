@@ -169,8 +169,8 @@ internal static partial class RepeatCorner
             SaveTrackMaps();
             nextMapSave = now + 10;
         }
-        if (reloadInProgress || !FindGame()) return;
-        var frame = ReadTelemetry(false);
+        if (resets.InProgress || !game.Find()) return;
+        var frame = game.ReadTelemetry(false);
         if (frame == null || !frame.HasCoordinates || frame.Speed < 10) return;
         var map = FindTrackMap(frame.Track);
         if (map != null && map.Imported) return;

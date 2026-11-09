@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.Linq;
-using System.Text;
 
 internal static partial class RepeatCorner
 {
@@ -23,23 +21,23 @@ internal static partial class RepeatCorner
 
     private static void TryMarkSection(bool start)
     {
-        if (!FindGame()) return;
-        string original = Json.Serialize(settings);
+        if (!game.Find()) return;
+        string original = store.Snapshot();
         try
         {
-            var frame = ReadTelemetry(true);
+            var frame = game.ReadTelemetry(true);
             if (frame == null)
                 throw new InvalidOperationException("Mark the timing line on track in solo Free Practice.");
-            var pin = ActiveCheckpoint();
+            var pin = store.ActiveCheckpoint();
             if (pin != null && !SameTrack(pin.Track, frame.Track))
                 throw new InvalidOperationException("Load the active save's track before marking the section.");
 
-            var section = CurrentSection(frame.Track);
+            var section = store.CurrentSection(frame.Track);
             if (start)
             {
-                if (section != null) settings.Sections.Remove(section);
-                section = new Section { Checkpoint = settings.ActiveCheckpoint, Track = frame.Track, Start = frame.Position };
-                settings.Sections.Add(section);
+                if (section != null) store.Settings.Sections.Remove(section);
+                section = new Section { Checkpoint = store.Settings.ActiveCheckpoint, Track = frame.Track, Start = frame.Position };
+                store.Settings.Sections.Add(section);
             }
             else
             {
@@ -50,7 +48,7 @@ internal static partial class RepeatCorner
                     throw new InvalidOperationException("Mark the finish further ahead on this section.");
                 SetFinish(section, frame.Position);
             }
-            StoreSettings();
+            store.Save();
             timer.Reset();
             DisableLoop("timing lines changed");
             ReportStatus(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
@@ -58,7 +56,7 @@ internal static partial class RepeatCorner
         }
         catch (Exception error)
         {
-            settings = Json.Deserialize<ToolSettings>(original);
+            store.Restore(original);
             ReportStatus("Could not mark section. " + error.Message);
         }
     }
@@ -69,18 +67,18 @@ internal static partial class RepeatCorner
     {
         start = WrapPosition(start);
         finish = WrapPosition(finish);
-        var pin = ActiveCheckpoint();
+        var pin = store.ActiveCheckpoint();
         if (pin != null && !SameTrack(pin.Track, track))
             throw new InvalidOperationException("Load the active save's track before setting the section.");
         double span = SectionTimer.ForwardDistance(start, finish);
         if (span < 0.0002 || span >= 0.5)
             throw new InvalidOperationException("The finish must be ahead of the start and within half a lap.");
 
-        var section = CurrentSection(track);
+        var section = store.CurrentSection(track);
         if (section == null)
         {
-            section = new Section { Checkpoint = settings.ActiveCheckpoint, Track = track, Start = start };
-            settings.Sections.Add(section);
+            section = new Section { Checkpoint = store.Settings.ActiveCheckpoint, Track = track, Start = start };
+            store.Settings.Sections.Add(section);
         }
         else if (section.Start != start)
         {
@@ -89,7 +87,7 @@ internal static partial class RepeatCorner
             section.BestAttempt = null;
         }
         SetFinish(section, finish);
-        StoreSettings();
+        store.Save();
         timer.Reset();
         DisableLoop("timing lines changed");
         ReportStatus(message);
@@ -106,14 +104,9 @@ internal static partial class RepeatCorner
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
 
-    internal static Section CurrentSection(string track)
-    {
-        return settings.Sections.Find(section => section.Checkpoint == settings.ActiveCheckpoint && SameTrack(section.Track, track));
-    }
-
     private static void PrintSections()
     {
-        var sections = settings.Sections.Where(section => section.Checkpoint == settings.ActiveCheckpoint).ToArray();
+        var sections = store.Settings.Sections.Where(section => section.Checkpoint == store.Settings.ActiveCheckpoint).ToArray();
         if (sections.Length == 0)
             Console.WriteLine("No timing lines for this section. In ACC, press Ctrl+Shift+K at the start and Ctrl+Shift+L at the exit.");
         foreach (var section in sections)
@@ -126,14 +119,14 @@ internal static partial class RepeatCorner
         double now = sectionClock.Elapsed.TotalSeconds;
         if (now < nextSample) return;
         nextSample = now + 0.025;
-        if (!settings.Sections.Any(section => section.Checkpoint == settings.ActiveCheckpoint && section.Finish.HasValue) ||
-            !FindGame())
+        if (!store.Settings.Sections.Any(section => section.Checkpoint == store.Settings.ActiveCheckpoint && section.Finish.HasValue) ||
+            !game.Find())
         {
             timer.Reset();
             return;
         }
-        var frame = ReadTelemetry(false);
-        var sectionOnTrack = frame == null ? null : CurrentSection(frame.Track);
+        var frame = game.ReadTelemetry(false);
+        var sectionOnTrack = frame == null ? null : store.CurrentSection(frame.Track);
         var result = timer.Observe(sectionOnTrack, frame);
         if (result == null) return;
         double? cut = CutMetres(sectionOnTrack, result);
@@ -145,55 +138,6 @@ internal static partial class RepeatCorner
         }
         ReportAttempt(sectionOnTrack, result);
         StartLoopCountdown(sectionOnTrack, string.Format("{0:0.00} seconds.", result.Seconds));
-    }
-
-    private static MemoryMappedViewAccessor OpenPage(string name, int size)
-    {
-        using (var map = MemoryMappedFile.OpenExisting(@"Local\acpmf_" + name, MemoryMappedFileRights.Read))
-            return map.CreateViewAccessor(0, size, MemoryMappedFileAccess.Read);
-    }
-
-    private static TelemetryFrame ReadTelemetry(bool allowPaused)
-    {
-        try
-        {
-            // Field offsets are from Kunos's ACC Shared Memory v1.8.12 layout (4-byte packing).
-            using (var graphics = OpenPage("graphics", 1240))
-            using (var physics = OpenPage("physics", 32))
-            using (var session = OpenPage("static", 688))
-            {
-                int status = graphics.ReadInt32(4);
-                if ((status != 2 && !(allowPaused && status == 3)) || graphics.ReadInt32(8) != 0 ||
-                    graphics.ReadInt32(160) != 0 || graphics.ReadInt32(1236) != 0 || session.ReadInt32(684) != 0)
-                    return null;
-
-                byte[] track = new byte[66];
-                session.ReadArray(134, track, 0, track.Length);
-                string trackName = Encoding.Unicode.GetString(track).Split('\0')[0];
-                double position = graphics.ReadSingle(248);
-                double distance = graphics.ReadSingle(156);
-                double speed = physics.ReadSingle(28);
-                if (trackName.Length == 0 || !(position >= 0 && position <= 1) ||
-                    !(distance >= 0 && distance < double.PositiveInfinity) || !(speed >= 0 && speed < 500))
-                    return null;
-                // The player's car in carCoordinates, matched by ID; x and z are the ground plane.
-                int active = Math.Min(60, Math.Max(0, graphics.ReadInt32(252)));
-                int player = graphics.ReadInt32(1216), slot = -1;
-                for (int car = 0; car < active && slot < 0; car++)
-                    if (graphics.ReadInt32(976 + car * 4) == player) slot = car;
-                return new TelemetryFrame
-                {
-                    HasCoordinates = slot >= 0,
-                    X = slot >= 0 ? graphics.ReadSingle(256 + slot * 12) : 0,
-                    Z = slot >= 0 ? graphics.ReadSingle(264 + slot * 12) : 0,
-                    Track = trackName, Position = position, Distance = distance, Speed = speed,
-                    Packet = graphics.ReadInt32(0), Time = sectionClock.Elapsed.TotalSeconds, Paused = status == 3
-                };
-            }
-        }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
-        catch (ArgumentException) { return null; }
     }
 
     internal sealed class TelemetryFrame

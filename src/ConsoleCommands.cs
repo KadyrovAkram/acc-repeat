@@ -50,11 +50,11 @@ internal static partial class RepeatCorner
 
     private static void ApplyCommand(Action command)
     {
-        string original = Json.Serialize(settings);
+        string original = store.Snapshot();
         try { command(); }
         catch (Exception error)
         {
-            settings = Json.Deserialize<ToolSettings>(original);
+            store.Restore(original);
             ReportStatus(error.Message);
         }
     }

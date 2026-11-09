@@ -34,7 +34,7 @@ internal static partial class RepeatCorner
             throw new InvalidOperationException("Use 'loop on [1-30]', 'loop off', or 'loop'.");
 
         var save = SelectSave();
-        var section = CurrentSection(save.Track);
+        var section = store.CurrentSection(save.Track);
         if (section == null || !section.Finish.HasValue)
             throw new InvalidOperationException("Mark both timing lines for the selected save before enabling the loop.");
 
@@ -42,7 +42,7 @@ internal static partial class RepeatCorner
         loopSave = save;
         loopDelay = delay;
         ReportStatus(string.Format("Hands-free loop armed for {0}. Auto-reset starts {1} s after the result callout.",
-            settings.ActiveCheckpoint ?? save.Label, delay));
+            store.Settings.ActiveCheckpoint ?? save.Label, delay));
     }
 
     private static void StartLoopCountdown(Section section, string announcement)
@@ -53,7 +53,7 @@ internal static partial class RepeatCorner
             DisableLoop("the current track differs from the selected save");
             return;
         }
-        loopWindow = game;
+        loopWindow = game.Handle;
         resultAnnouncement = SpeakLoop(announcement);
         countdown = new LoopCountdown(sectionClock.Elapsed.TotalSeconds, loopDelay);
         nextLoopCheck = 0;
@@ -84,7 +84,7 @@ internal static partial class RepeatCorner
 
         if (now < nextLoopCheck) return;
         nextLoopCheck = now + 0.05;
-        var frame = ReadTelemetry(true);
+        var frame = game.ReadTelemetry(true);
         if (frame == null)
         {
             // ACC can briefly drop its telemetry before Windows reports the new foreground window.

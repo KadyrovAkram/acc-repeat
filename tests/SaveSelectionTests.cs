@@ -59,36 +59,37 @@ namespace ACCRepeat.Tests
         private readonly Save[] saves;
         private readonly Section section = new Section { Checkpoint = "Monza", Track = "monza", Start = 0.04, Finish = 0.18 };
         private readonly Attempt attempt = new Attempt { Seconds = 28.417 };
+        private readonly SettingsStore store = new SettingsStore("unused.settings.json");
 
         public CheckpointRenameTests()
         {
             saves = new[] { replacement, save };
-            settings = new ToolSettings { ActiveCheckpoint = "Monza T1" };
-            settings.Checkpoints.Add(new Checkpoint { Name = "Monza", Slot = "4", Created = "old", Track = "monza" });
-            settings.Checkpoints.Add(new Checkpoint { Name = "Monza T1", Slot = "4", Created = "old", Track = "monza" });
+            store.Settings.ActiveCheckpoint = "Monza T1";
+            store.Settings.Checkpoints.Add(new Checkpoint { Name = "Monza", Slot = "4", Created = "old", Track = "monza" });
+            store.Settings.Checkpoints.Add(new Checkpoint { Name = "Monza T1", Slot = "4", Created = "old", Track = "monza" });
             RecordAttempt(section, attempt);
-            settings.Sections.Add(section);
-            CollapseDuplicatePins();
+            store.Settings.Sections.Add(section);
+            store.CollapseDuplicatePins();
         }
 
         [Fact]
         public void DuplicatePinsCollapseWithoutLosingTheActivePinOrSection()
         {
-            Assert.Single(settings.Checkpoints);
-            Assert.Equal("Monza T1", ActiveCheckpoint().Name);
-            Assert.Same(section, CurrentSection("monza"));
+            Assert.Single(store.Settings.Checkpoints);
+            Assert.Equal("Monza T1", store.ActiveCheckpoint().Name);
+            Assert.Same(section, store.CurrentSection("monza"));
         }
 
         [Fact]
         public void RenameKeepsTimingLinesAndHistory()
         {
-            SetCheckpointName(saves, save, "  First chicane  ");
+            store.SetCheckpointName(saves, save, "  First chicane  ");
 
-            Assert.Single(settings.Checkpoints);
-            Assert.Null(FindCheckpoint("Monza T1"));
-            Assert.Equal("First chicane", ActiveCheckpoint().Name);
-            Assert.Same(save, SelectSave(saves, ActiveCheckpoint()));
-            Assert.Same(section, CurrentSection("monza"));
+            Assert.Single(store.Settings.Checkpoints);
+            Assert.Null(store.FindCheckpoint("Monza T1"));
+            Assert.Equal("First chicane", store.ActiveCheckpoint().Name);
+            Assert.Same(save, SelectSave(saves, store.ActiveCheckpoint()));
+            Assert.Same(section, store.CurrentSection("monza"));
             Assert.Equal(0.04, section.Start);
             Assert.Equal(0.18, section.Finish);
             Assert.Same(attempt, section.BestAttempt);
@@ -98,40 +99,40 @@ namespace ACCRepeat.Tests
         [Fact]
         public void CaseOnlyRenameUpdatesTheActiveName()
         {
-            SetCheckpointName(saves, save, "First chicane");
-            SetCheckpointName(saves, save, "First Chicane");
-            Assert.Single(settings.Checkpoints);
-            Assert.Same(section, CurrentSection("monza"));
-            Assert.Equal("First Chicane", settings.ActiveCheckpoint);
+            store.SetCheckpointName(saves, save, "First chicane");
+            store.SetCheckpointName(saves, save, "First Chicane");
+            Assert.Single(store.Settings.Checkpoints);
+            Assert.Same(section, store.CurrentSection("monza"));
+            Assert.Equal("First Chicane", store.Settings.ActiveCheckpoint);
         }
 
         [Fact]
         public void PinningANewSaveInTheSameSlotLeavesTheExistingPinAlone()
         {
-            SetCheckpointName(saves, save, "First Chicane");
-            SetCheckpointName(saves, replacement, "New save");
-            Assert.Equal(2, settings.Checkpoints.Count);
-            Assert.Equal("old", FindCheckpoint("First Chicane").Created);
+            store.SetCheckpointName(saves, save, "First Chicane");
+            store.SetCheckpointName(saves, replacement, "New save");
+            Assert.Equal(2, store.Settings.Checkpoints.Count);
+            Assert.Equal("old", store.FindCheckpoint("First Chicane").Created);
         }
 
         [Fact]
         public void RenameCannotTakeAnotherSavesName()
         {
-            SetCheckpointName(saves, save, "First Chicane");
-            SetCheckpointName(saves, replacement, "New save");
-            Assert.Throws<InvalidOperationException>(() => SetCheckpointName(saves, replacement, "First Chicane"));
+            store.SetCheckpointName(saves, save, "First Chicane");
+            store.SetCheckpointName(saves, replacement, "New save");
+            Assert.Throws<InvalidOperationException>(() => store.SetCheckpointName(saves, replacement, "First Chicane"));
         }
 
         [Fact]
         public void CollapsingKeepsASeparateDrillOnTheSameSave()
         {
-            SetCheckpointName(saves, save, "First Chicane");
-            SetCheckpointName(saves, replacement, "New save");
-            settings.Checkpoints.Add(new Checkpoint { Name = "Separate drill", Slot = "4", Created = "old", Track = "monza" });
-            settings.Sections.Add(new Section { Checkpoint = "Separate drill", Track = "monza", Start = 0.21, Finish = 0.28 });
-            CollapseDuplicatePins();
-            Assert.Equal(3, settings.Checkpoints.Count);
-            Assert.Equal(2, settings.Sections.Count);
+            store.SetCheckpointName(saves, save, "First Chicane");
+            store.SetCheckpointName(saves, replacement, "New save");
+            store.Settings.Checkpoints.Add(new Checkpoint { Name = "Separate drill", Slot = "4", Created = "old", Track = "monza" });
+            store.Settings.Sections.Add(new Section { Checkpoint = "Separate drill", Track = "monza", Start = 0.21, Finish = 0.28 });
+            store.CollapseDuplicatePins();
+            Assert.Equal(3, store.Settings.Checkpoints.Count);
+            Assert.Equal(2, store.Settings.Sections.Count);
         }
     }
 }

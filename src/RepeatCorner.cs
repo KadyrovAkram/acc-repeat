@@ -10,21 +10,18 @@ using System.Threading;
 internal static partial class RepeatCorner
 {
     private const string GameProcess = "AC2-Win64-Shipping";
-    private const string PlayCovered = "Another window is covering the save's Play button. Move it away and reset again.";
     private const int HotkeyMessage = 0x0312;
     private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
-    private static IntPtr game;
-    private static Point origin;
-    private static MenuLayout layout;
-    private static bool diagnostics;
-    private static string stage;
-    private static bool reloadInProgress;
-    private static bool reloadWaitingForFocus;
-    private static double reloadTimeAway;
-    private static int reloadFocusVersion;
     private static DesktopSession desktopSession;
 
-    private static double ReloadTime { get { return sectionClock.Elapsed.TotalSeconds - reloadTimeAway; } }
+    // The engine's parts. The engine thread is the only thread that uses them; the window
+    // reads DeskSnapshot copies instead. Tests build their own instances.
+    private static readonly EngineClock clock = new EngineClock();
+    private static readonly SettingsStore store = new SettingsStore(SettingsStore.DefaultPath);
+    private static readonly GameConnection game = new GameConnection(clock);
+    private static readonly ScreenCapture screen = new ScreenCapture();
+    private static readonly RetryController resets =
+        new RetryController(game, screen, new DesktopInput(), clock, new EngineResetHost());
 
     private static int Main(string[] args)
     {
@@ -71,7 +68,7 @@ internal static partial class RepeatCorner
                 DiagnosticLog.Warn("One or more section hotkeys (Ctrl+Shift+K / L) are already in use.");
             try
             {
-                LoadSettings();
+                store.Load();
                 LoadTrackMaps();
                 PruneAllCuts();
                 if (desktop == null)
@@ -84,7 +81,7 @@ internal static partial class RepeatCorner
                     Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
                     Console.WriteLine("English ACC menus: 1080p, 1440p, 1440 x 900, or 2880 x 1800.");
                     Console.WriteLine("Type 'help' for console commands.");
-                    Console.WriteLine("Active save: " + (settings.ActiveCheckpoint ?? "latest save"));
+                    Console.WriteLine("Active save: " + (store.Settings.ActiveCheckpoint ?? "latest save"));
                     StartConsoleInput();
                 }
                 else
@@ -128,13 +125,6 @@ internal static partial class RepeatCorner
         if (desktopSession != null) desktopSession.Note(message);
     }
 
-    // Every reset step goes through here, so the log shows exactly how far a failed reset got.
-    private static void SetStage(string name)
-    {
-        stage = name;
-        DiagnosticLog.Info("Reset step: " + name + ".");
-    }
-
     private static void EnableDpiAwareness()
     {
         try
@@ -147,205 +137,19 @@ internal static partial class RepeatCorner
 
     private static bool TryRetry(bool keyboard, Save expected = null)
     {
-        if (!FindGame() || (expected != null && game != loopWindow)) return false;
+        if (!game.Find() || (expected != null && game.Handle != loopWindow)) return false;
         if (expected != null) Console.WriteLine("Auto-resetting...");
         DiagnosticLog.Info(expected != null ? "Auto-reset started by the loop." :
             keyboard ? "Reset started from the keyboard shortcut." : "Reset started from the wheel button.");
         CancelLoopCountdown();
         timer.Reset();
-        reloadInProgress = true;
         HideOverlayNow();
-        reloadTimeAway = 0;
-        reloadFocusVersion = 0;
-        layout = null;
-        try { Retry(keyboard, expected); }
-        catch (Exception error)
-        {
-            DisableLoop("reset stopped");
-            DiagnosticLog.Error("Reset stopped while " + stage + ".", error);
-            ReportStatus("Stopped while " + stage + ". " + error.Message);
-        }
-        finally
-        {
-            reloadWaitingForFocus = false;
-            reloadInProgress = false;
-            overlaySuppressed = false;
-        }
+        try { resets.Run(keyboard, expected); }
+        finally { overlaySuppressed = false; }
         wheelArmed = false;
         Message pending;
         while (PeekMessage(out pending, IntPtr.Zero, HotkeyMessage, HotkeyMessage, 1)) { }
         return true;
-    }
-
-    private static void Retry(bool keyboard, Save expected)
-    {
-        double started = ReloadTime;
-        SetStage("waiting for the shortcut keys to be released");
-        while (keyboard && (IsDown(0x11) || IsDown(0x10) || IsDown(0x4A) || IsDown(0x5B) || IsDown(0x5C)))
-        {
-            EnsureGame();
-            if (ReloadTime - started > 2)
-                throw new InvalidOperationException("Release the shortcut keys promptly and try again.");
-            Thread.Sleep(20);
-        }
-        SetStage("checking the practice save");
-        var checkpoint = SelectSave();
-        if (expected != null && !expected.SameSave(checkpoint))
-            throw new InvalidOperationException("The selected save changed. Enable the loop again for the new save.");
-        if (loopSave != null && !loopSave.SameSave(checkpoint))
-            DisableLoop("the selected save changed");
-        Console.WriteLine("Resetting to " + checkpoint.Label + "...");
-        DiagnosticLog.Info(string.Format("Resetting to {0} (track {1}, Saved Games row {2}).",
-            checkpoint.Label, checkpoint.Track, checkpoint.Row + 1));
-        EnsureGame();
-        if (!Matches(layout.SavedTitle)) ExitPracticeForRetry(checkpoint);
-        SetStage("selecting Play on the save's row");
-        Click(CheckpointPlayButton(checkpoint), layout.SavedTitle, checkpoint);
-        WaitFor("restored save and Drive button", layout.Pause, 90);
-        SetStage("selecting Drive");
-        Click(layout.DriveButton, layout.Pause);
-        int driveFocusVersion = reloadFocusVersion;
-        double driveStarted = ReloadTime;
-        while (true)
-        {
-            bool paused = Matches(layout.Pause);
-            if (!paused && PracticeStatus() == 2)
-                break;
-            if (paused && driveFocusVersion != reloadFocusVersion)
-            {
-                // ACC may have paused again after the original Drive click.
-                Click(layout.DriveButton, layout.Pause);
-                driveFocusVersion = reloadFocusVersion;
-                driveStarted = ReloadTime;
-            }
-            if (ReloadTime - driveStarted > 3)
-                throw new InvalidOperationException("The Drive menu did not close.");
-            Thread.Sleep(100);
-        }
-        ReportStatus("Drive resumed after " + (ReloadTime - started).ToString("0.0") + " seconds of reload time.");
-    }
-
-    private static Point CheckpointPlayButton(Save checkpoint)
-    {
-        var point = layout.PlayButtonPosition;
-        point.Offset(0, layout.RowOffset(checkpoint.Row));
-        return point;
-    }
-
-    private static void ExitPracticeForRetry(Save checkpoint)
-    {
-        int status = PracticeStatus();
-        if (status != 2 && status != 3)
-            throw new InvalidOperationException("Start in solo Free Practice or on the Saved Games screen.");
-
-        SetStage("checking the save's Play button");
-        EnsureGame();
-        var play = Point.Add(origin, (Size)layout.ToClient(CheckpointPlayButton(checkpoint)));
-        if (GetForegroundWindow() == game && WindowFromPoint(play) != game)
-            throw new InvalidOperationException(PlayCovered);
-
-        if (status == 2 && !Matches(layout.Pause))
-        {
-            SetStage("opening the pause menu");
-            EnsureGame();
-            if (PracticeStatus() == 2)
-            {
-                Key(0x1B, 0);
-                Thread.Sleep(45);
-                Key(0x1B, 2);
-            }
-        }
-
-        WaitFor("Free Practice pause menu", layout.Pause, 3);
-        SetStage("selecting Quit");
-        Click(layout.QuitButton, layout.Pause);
-        WaitFor("Quit confirmation", layout.Confirm, 3);
-        SetStage("confirming Quit");
-        Click(layout.ConfirmButton, layout.Confirm);
-        OpenSavedGames();
-    }
-
-    private static int PracticeStatus()
-    {
-        using (var map = MemoryMappedFile.OpenExisting(@"Local\acpmf_graphics", MemoryMappedFileRights.Read))
-        using (var view = map.CreateViewAccessor(0, 12, MemoryMappedFileAccess.Read))
-        {
-            // The graphics page starts with the packet ID, game status, and session type.
-            return view.ReadInt32(8) == 0 ? view.ReadInt32(4) : 0;
-        }
-    }
-
-    private static void OpenSavedGames()
-    {
-        WaitFor("main menu", layout.Home, 45);
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            SetStage("opening Saved Games (attempt " + attempt + " of 3)");
-            Click(layout.SavedGamesButton, layout.Home);
-            if (WaitForMenu(layout.SavedTitle, 2)) return;
-
-            // Retry only if ACC still shows the main menu. A late transition may already be underway.
-            if (!Matches(layout.Home))
-            {
-                WaitFor("Saved Games after leaving the main menu", layout.SavedTitle, 6);
-                return;
-            }
-            if (attempt < 3)
-            {
-                Console.WriteLine("ACC is still on the main menu. Retrying Saved Games.");
-                DiagnosticLog.Warn("ACC is still on the main menu. Retrying Saved Games.");
-            }
-        }
-        throw new InvalidOperationException("ACC stayed on the main menu after three Saved Games clicks.");
-    }
-
-    private static void WaitFor(string name, Signature[] signatures, int seconds)
-    {
-        SetStage("waiting for " + name);
-        double started = ReloadTime;
-        if (!WaitForMenu(signatures, seconds))
-            throw new InvalidOperationException("Could not recognize " + name + ".");
-        DiagnosticLog.Info(string.Format("Recognized {0} after {1:0.00} s.", name, ReloadTime - started));
-    }
-
-    private static bool WaitForMenu(Signature[] signatures, int seconds)
-    {
-        double started = ReloadTime;
-        while (!Matches(signatures))
-        {
-            if (ReloadTime - started >= seconds)
-                return false;
-            Thread.Sleep(125);
-        }
-        return true;
-    }
-
-    private static bool Matches(Signature[] signatures, int yOffset = 0, double brightCoverage = 0.70)
-    {
-        EnsureGame();
-        bool matched = true;
-        foreach (var label in signatures)
-        {
-            var region = layout.CaptureRegion(label, yOffset);
-            int padding = layout.SignaturePadding;
-            var referenceSize = new Size(label.Width + 2 * padding, label.Height + 2 * padding);
-            using (var capture = new Bitmap(region.Width, region.Height))
-            using (var captureGraphics = Graphics.FromImage(capture))
-            using (var bitmap = new Bitmap(referenceSize.Width, referenceSize.Height))
-            using (var graphics = Graphics.FromImage(bitmap))
-            {
-                captureGraphics.CopyFromScreen(origin.X + region.X, origin.Y + region.Y,
-                    0, 0, capture.Size);
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
-                graphics.DrawImage(capture, new Rectangle(Point.Empty, referenceSize));
-                if (!label.Matches(bitmap, brightCoverage, padding))
-                {
-                    if (!diagnostics) return false;
-                    matched = false;
-                }
-            }
-        }
-        return matched;
     }
 
     internal sealed class Signature
@@ -359,7 +163,8 @@ internal static partial class RepeatCorner
             mask = Convert.FromBase64String(encoded);
         }
 
-        public bool Matches(Bitmap bitmap, double brightCoverage, int padding)
+        // With diagnostics on, the score of the exact-position check is printed to the console.
+        public bool Matches(Bitmap bitmap, double brightCoverage, int padding, bool diagnostics = false)
         {
             var brightPixels = new bool[bitmap.Width, bitmap.Height];
             for (int y = 0; y < bitmap.Height; y++)
@@ -368,19 +173,19 @@ internal static partial class RepeatCorner
                 var pixel = bitmap.GetPixel(x, y);
                 brightPixels[x, y] = pixel.R >= 120 && pixel.G >= 120 && pixel.B >= 120;
             }
-            if (MatchesAt(brightPixels, brightCoverage, padding, padding, false))
+            if (MatchesAt(brightPixels, brightCoverage, padding, padding, false, diagnostics))
                 return true;
 
             // ACC can move individual labels slightly when changing the render resolution.
             // Retain the dark outline and allow only a one-pixel change in the bright strokes.
             for (int y = 1; y < 2 * padding; y++)
             for (int x = 1; x < 2 * padding; x++)
-                if (MatchesAt(brightPixels, brightCoverage, x, y, true))
+                if (MatchesAt(brightPixels, brightCoverage, x, y, true, false))
                     return true;
             return false;
         }
 
-        private bool MatchesAt(bool[,] pixels, double brightCoverage, int left, int top, bool flexible)
+        private bool MatchesAt(bool[,] pixels, double brightCoverage, int left, int top, bool flexible, bool diagnostics)
         {
             int foreground = 0, background = 0, foregroundMatches = 0, nearbyMatches = 0, backgroundMatches = 0;
             for (int y = 0; y < Height; y++)
@@ -415,175 +220,42 @@ internal static partial class RepeatCorner
 
     private static int CheckScreen()
     {
-        if (!FindGame()) return 1;
-        diagnostics = true;
-        EnsureGame();
-        Console.WriteLine("Origin " + origin + ", ACC client size " + layout.ClientSize);
-        Console.WriteLine("Practice pause: " + Matches(layout.Pause));
-        Console.WriteLine("Quit confirmation: " + Matches(layout.Confirm));
-        Console.WriteLine("Main menu: " + Matches(layout.Home));
-        bool savedGames = Matches(layout.SavedTitle);
+        if (!game.Find()) return 1;
+        screen.Diagnostics = true;
+        resets.EnsureGame();
+        Console.WriteLine("Origin " + game.Origin + ", ACC client size " + game.Layout.ClientSize);
+        Console.WriteLine("Practice pause: " + resets.Matches(game.Layout.Pause));
+        Console.WriteLine("Quit confirmation: " + resets.Matches(game.Layout.Confirm));
+        Console.WriteLine("Main menu: " + resets.Matches(game.Layout.Home));
+        bool savedGames = resets.Matches(game.Layout.SavedTitle);
         Console.WriteLine("Saved Games: " + savedGames);
         if (savedGames)
         {
             for (int row = 0; row < VisibleSaveRows; row++)
-                Console.WriteLine("Practice Play row " + (row + 1) + ": " + MatchesSaveRow(row));
+                Console.WriteLine("Practice Play row " + (row + 1) + ": " + resets.MatchesSaveRow(row));
         }
         return 0;
     }
 
-    private static bool FindGame()
-    {
-        game = GetForegroundWindow();
-        uint pid;
-        GetWindowThreadProcessId(game, out pid);
-        if (pid == 0) return false;
-        try
-        {
-            using (var process = Process.GetProcessById((int)pid))
-                return process.ProcessName == GameProcess;
-        }
-        catch (ArgumentException) { return false; }
-    }
-
-    private static void EnsureGame()
-    {
-        CheckDesktopClosing();
-        if (desktopSession != null) desktopSession.Publish();
-        if (IsDown(0x78))
-            throw new OperationCanceledException("Cancelled with F9.");
-        if (GetForegroundWindow() != game)
-        {
-            if (!reloadInProgress)
-                throw new InvalidOperationException("ACC lost focus. Switch back to ACC and reset again.");
-            WaitForReloadFocus();
-        }
-        var size = ReadClientSize(out origin);
-        if (layout == null)
-        {
-            layout = MenuLayout.Select(size);
-            DiagnosticLog.Info(string.Format("ACC client area {0} x {1} at {2}, {3}.", size.Width, size.Height, origin.X, origin.Y));
-        }
-        else if (layout.ClientSize != size)
-            throw new InvalidOperationException("The ACC window changed size. Reset again from the practice session.");
-    }
-
-    private static Size ReadClientSize(out Point clientOrigin)
-    {
-        Rect bounds;
-        clientOrigin = Point.Empty;
-        if (!GetClientRect(game, out bounds) || !ClientToScreen(game, ref clientOrigin))
-            throw new InvalidOperationException("Could not read the ACC window size and position.");
-        return new Size(bounds.Right, bounds.Bottom);
-    }
-
     private static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
 
-    private static void CheckDesktopClosing()
+    // Connects a reset to the rest of the engine: the window, save selection and the loop.
+    private sealed class EngineResetHost : IResetHost
     {
-        if (desktopSession != null && desktopSession.IsClosing)
-            throw new OperationCanceledException("ACC Repeat is closing.");
-    }
+        public bool IsClosing { get { return desktopSession != null && desktopSession.IsClosing; } }
 
-    private static void WaitForReloadFocus()
-    {
-        Console.WriteLine("Reload paused. Switch back to ACC to continue, or press F9 to cancel.");
-        reloadWaitingForFocus = true;
-        if (desktopSession != null) desktopSession.Publish(true);
-        double awaySince = sectionClock.Elapsed.TotalSeconds;
-        reloadFocusVersion++;
-        // Fullscreen ACC may briefly report a different client size while it restores the display mode.
-        double focusedSince = -1;
-        while (true)
+        public void Publish(bool immediate)
         {
-            CheckDesktopClosing();
-            if (IsDown(0x78)) throw new OperationCanceledException("Cancelled with F9.");
-            if (!IsWindow(game)) throw new InvalidOperationException("ACC closed during the reload.");
-            if (GetForegroundWindow() == game)
-            {
-                double now = sectionClock.Elapsed.TotalSeconds;
-                if (focusedSince < 0) focusedSince = now;
-                Point clientOrigin;
-                bool restored = layout == null || ReadClientSize(out clientOrigin) == layout.ClientSize;
-                if (now - focusedSince >= 0.25 && (restored || now - focusedSince >= 2))
-                    break;
-            }
-            else
-                focusedSince = -1;
-            Thread.Sleep(25);
+            if (desktopSession != null) desktopSession.Publish(immediate);
         }
-        reloadTimeAway += sectionClock.Elapsed.TotalSeconds - awaySince;
-        reloadWaitingForFocus = false;
-        Console.WriteLine("ACC focused. Checking the menu before continuing.");
-    }
 
-    private static void Click(Point button, Signature[] expected, Save checkpoint = null)
-    {
-        double started = ReloadTime;
-        bool playCovered = false;
-        while (ReloadTime - started < 4)
-        {
-            EnsureGame();
-            int focusVersion = reloadFocusVersion;
-            var offset = layout.ToClient(button);
-            var point = Point.Add(origin, (Size)offset);
-            bool expectedMenu = Matches(expected) && GetForegroundWindow() == game;
-            bool gameAtButton = expectedMenu && WindowFromPoint(point) == game;
-            playCovered = checkpoint != null && expectedMenu && !gameAtButton;
-            if (gameAtButton && !IsDown(0x01) && !IsDown(0x02) && SetCursorPos(point.X, point.Y))
-            {
-                // Hover reveals Play. Verify the same screen again before sending the click.
-                Thread.Sleep(65);
-                if (Matches(expected) && (checkpoint == null || MatchesSaveRow(checkpoint.Row)))
-                {
-                    EnsureGame();
-                    if (checkpoint != null)
-                    {
-                        var selected = SelectSave();
-                        if (!checkpoint.SameSave(selected) || checkpoint.Row != selected.Row)
-                            throw new InvalidOperationException("The save list changed during the reset.");
-                    }
-                    Point cursor;
-                    if ((expected != layout.Pause || PracticeStatus() == 3) &&
-                        focusVersion == reloadFocusVersion && point == Point.Add(origin, (Size)offset) && GetForegroundWindow() == game &&
-                        WindowFromPoint(point) == game && GetCursorPos(out cursor) &&
-                        cursor == point && !IsDown(0x01) && !IsDown(0x02))
-                    {
-                        CheckDesktopClosing();
-                        SendClick(point);
-                        return;
-                    }
-                }
-            }
-            Thread.Sleep(125);
-        }
-        throw new InvalidOperationException(playCovered ? PlayCovered : "Could not confirm the expected ACC menu button.");
-    }
+        public Save SelectSave() { return RepeatCorner.SelectSave(); }
 
-    private static bool MatchesSaveRow(int row)
-    {
-        // Row spacing is fractional in ACC, so scaled text varies slightly by row.
-        return Matches(layout.SaveRow, layout.RowOffset(row), 0.62);
-    }
+        public Save LoopSave { get { return loopSave; } }
 
-    private static void SendClick(Point point)
-    {
-        // Batch positioning and both button events so physical mouse movement cannot split them.
-        int x = AbsoluteCoordinate(point.X, GetSystemMetrics(76), GetSystemMetrics(78));
-        int y = AbsoluteCoordinate(point.Y, GetSystemMetrics(77), GetSystemMetrics(79));
-        const uint absoluteVirtualMove = 0xC001;
-        var events = new[]
-        {
-            new Input { Mouse = new MouseInput { X = x, Y = y, Flags = absoluteVirtualMove | 2 } },
-            new Input { Mouse = new MouseInput { X = x, Y = y, Flags = absoluteVirtualMove | 4 } }
-        };
-        if (SendInput((uint)events.Length, events, Marshal.SizeOf(typeof(Input))) != events.Length)
-            throw new InvalidOperationException("Windows could not send the ACC menu click.");
-    }
+        public void DisableLoop(string reason) { RepeatCorner.DisableLoop(reason); }
 
-    private static int AbsoluteCoordinate(int pixel, int start, int size)
-    {
-        return (int)(((long)(pixel - start) * 65536 + 32768) / size);
+        public void Report(string message) { ReportStatus(message); }
     }
 
     [StructLayout(LayoutKind.Sequential)]

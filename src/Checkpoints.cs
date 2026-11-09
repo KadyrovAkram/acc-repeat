@@ -11,10 +11,8 @@ internal static partial class RepeatCorner
 {
     internal const int VisibleSaveRows = 5;
     internal static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
-    private static readonly string SettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ACCRepeat.settings.json");
     private static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "Assetto Corsa Competizione", "Savegames");
-    internal static ToolSettings settings = new ToolSettings();
 
     public sealed class ToolSettings
     {
@@ -44,48 +42,6 @@ internal static partial class RepeatCorner
         {
             return pin != null && Slot == pin.Slot && Created == pin.Created && Track == pin.Track;
         }
-    }
-
-    private static void LoadSettings()
-    {
-        settings = File.Exists(SettingsPath)
-            ? Json.Deserialize<ToolSettings>(File.ReadAllText(SettingsPath))
-            : new ToolSettings();
-        if (settings == null || settings.Checkpoints == null || settings.Sections == null)
-            throw new InvalidOperationException("ACCRepeat.settings.json is invalid.");
-        CollapseDuplicatePins();
-    }
-
-    internal static void CollapseDuplicatePins()
-    {
-        var groups = settings.Checkpoints.GroupBy(pin => new { pin.Slot, pin.Created, pin.Track }).ToArray();
-        var active = FindCheckpoint(settings.ActiveCheckpoint);
-        foreach (var group in groups.Where(group => group.Count() > 1))
-        {
-            var names = group.Select(pin => pin.Name).ToArray();
-            var sections = settings.Sections.Where(section => section.Checkpoint != null &&
-                names.Contains(section.Checkpoint, StringComparer.OrdinalIgnoreCase)).ToArray();
-            // Older versions let separate drills share a save. Preserve pins that each have timing data.
-            if (sections.Select(section => section.Checkpoint).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
-                continue;
-
-            var keep = group.Contains(active) ? active : group.Last();
-            foreach (var section in sections)
-                section.Checkpoint = keep.Name;
-            settings.Checkpoints.RemoveAll(pin => pin != keep && group.Contains(pin));
-            if (keep == active)
-                settings.ActiveCheckpoint = keep.Name;
-        }
-    }
-
-    private static void StoreSettings()
-    {
-        string pending = SettingsPath + ".tmp";
-        File.WriteAllText(pending, Json.Serialize(settings));
-        if (File.Exists(SettingsPath))
-            File.Replace(pending, SettingsPath, null);
-        else
-            File.Move(pending, SettingsPath);
     }
 
     private static Save[] ReadSaves()
@@ -165,23 +121,9 @@ internal static partial class RepeatCorner
         };
     }
 
-    internal static Checkpoint ActiveCheckpoint()
-    {
-        if (string.IsNullOrEmpty(settings.ActiveCheckpoint)) return null;
-        var pin = FindCheckpoint(settings.ActiveCheckpoint);
-        if (pin == null)
-            throw new InvalidOperationException("The active pin is missing. Choose Latest save or select another pin.");
-        return pin;
-    }
-
-    internal static Checkpoint FindCheckpoint(string name)
-    {
-        return settings.Checkpoints.Find(pin => string.Equals(pin.Name, name, StringComparison.OrdinalIgnoreCase));
-    }
-
     private static Save SelectSave()
     {
-        return SelectSave(ReadSaves(), ActiveCheckpoint());
+        return SelectSave(ReadSaves(), store.ActiveCheckpoint());
     }
 
     internal static Save SelectSave(Save[] saves, Checkpoint pin)
@@ -223,58 +165,35 @@ internal static partial class RepeatCorner
 
     private static void PinCheckpoint(Save[] saves, Save selected, string name)
     {
-        SetCheckpointName(saves, selected, name);
-        StoreSettings();
+        store.SetCheckpointName(saves, selected, name);
+        store.Save();
         DisableLoop("the active save changed");
-        ReportStatus("Active save: " + settings.ActiveCheckpoint);
-    }
-
-    internal static void SetCheckpointName(Save[] saves, Save selected, string name)
-    {
-        name = name.Trim();
-        var named = FindCheckpoint(name);
-        if (name.Length == 0 || (named != null && !selected.MatchesPin(named)))
-            throw new InvalidOperationException("Choose a non-empty name that isn't used by another save.");
-
-        var active = FindCheckpoint(settings.ActiveCheckpoint);
-        var existing = named ?? (selected.MatchesPin(active) ? active : settings.Checkpoints.LastOrDefault(selected.MatchesPin));
-        var pin = existing ?? new Checkpoint { Name = name, Slot = selected.Slot, Created = selected.Created, Track = selected.Track };
-        SelectSave(saves, pin);
-        if (existing == null)
-            settings.Checkpoints.Add(pin);
-        else
-        {
-            foreach (var section in settings.Sections.Where(section =>
-                string.Equals(section.Checkpoint, pin.Name, StringComparison.OrdinalIgnoreCase)))
-                section.Checkpoint = name;
-            pin.Name = name;
-        }
-        settings.ActiveCheckpoint = name;
+        ReportStatus("Active save: " + store.Settings.ActiveCheckpoint);
     }
 
     private static void UseCheckpoint(string name)
     {
-        var pin = FindCheckpoint(name);
+        var pin = store.FindCheckpoint(name);
         if (pin == null)
             throw new InvalidOperationException("Unknown pin. Type 'pins' to list names.");
-        settings.ActiveCheckpoint = pin.Name;
-        StoreSettings();
+        store.Settings.ActiveCheckpoint = pin.Name;
+        store.Save();
         DisableLoop("the active save changed");
         ReportStatus("Active save: " + pin.Name);
     }
 
     private static void UseLatest()
     {
-        settings.ActiveCheckpoint = null;
-        StoreSettings();
+        store.Settings.ActiveCheckpoint = null;
+        store.Save();
         DisableLoop("the active save changed");
         ReportStatus("Reset will use the newest save if it is from Free Practice.");
     }
 
     private static void PrintCheckpoints()
     {
-        Console.WriteLine("Active save: " + (settings.ActiveCheckpoint ?? "latest save"));
-        foreach (var pin in settings.Checkpoints)
+        Console.WriteLine("Active save: " + (store.Settings.ActiveCheckpoint ?? "latest save"));
+        foreach (var pin in store.Settings.Checkpoints)
             Console.WriteLine("  {0} - {1} ({2})", pin.Name, pin.Track, pin.Created);
     }
 }

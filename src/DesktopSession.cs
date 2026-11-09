@@ -74,7 +74,7 @@ internal static partial class RepeatCorner
             if (!immediate && now < nextPublish) return;
             nextPublish = now + 0.15;
 
-            bool refreshed = !reloadInProgress && now >= nextRefresh;
+            bool refreshed = !resets.InProgress && now >= nextRefresh;
             if (refreshed)
             {
                 nextRefresh = now + 1;
@@ -85,7 +85,7 @@ internal static partial class RepeatCorner
             string checkpointDetail = savesError;
             if (savesError == null)
             {
-                try { selected = SelectSave(saves, ActiveCheckpoint()); }
+                try { selected = SelectSave(saves, store.ActiveCheckpoint()); }
                 catch (InvalidOperationException error) { checkpointDetail = error.Message; }
             }
             if (selected != null)
@@ -98,15 +98,15 @@ internal static partial class RepeatCorner
                 loadPositionSave = selected;
             }
 
-            var activePin = FindCheckpoint(settings.ActiveCheckpoint);
+            var activePin = store.FindCheckpoint(store.Settings.ActiveCheckpoint);
             string track = selected != null ? selected.Track : activePin == null ? null : activePin.Track;
-            var section = track == null ? null : CurrentSection(track);
+            var section = track == null ? null : store.CurrentSection(track);
             snapshot = new DeskSnapshot
             {
                 Connected = connected,
-                InPracticeSession = connected && !reloadInProgress && settings.Overlay != "Off" && IsPracticeSessionActive(),
-                PinNames = settings.Checkpoints.Select(pin => pin.Name).ToArray(),
-                ActivePin = settings.ActiveCheckpoint,
+                InPracticeSession = connected && !resets.InProgress && store.Settings.Overlay != "Off" && IsPracticeSessionActive(),
+                PinNames = store.Settings.Checkpoints.Select(pin => pin.Name).ToArray(),
+                ActivePin = store.Settings.ActiveCheckpoint,
                 AvailableSaves = saves.Where(save => save.Row < VisibleSaveRows && save.Mode == "Practice").ToArray(),
                 CheckpointDetail = checkpointDetail,
                 Start = section == null ? (double?)null : section.Start,
@@ -114,22 +114,22 @@ internal static partial class RepeatCorner
                 LoadPosition = selected == null ? null : loadPosition,
                 Recent = section == null ? new Attempt[0] : section.RecentAttempts.ToArray(),
                 Best = section == null ? null : section.BestAttempt,
-                Wheel = settings.Wheel,
+                Wheel = store.Settings.Wheel,
                 LearningWheel = learnWheel != null,
                 LoopArmed = loopSave != null,
                 Track = track,
                 TrackName = selected != null && selected.TrackDisplayName != null ? selected.TrackDisplayName : track,
                 Map = MapView(track),
                 CanArm = selected != null && section != null && section.Finish.HasValue,
-                Reloading = reloadInProgress,
-                OverlayPosition = OverlayPositions.Contains(settings.Overlay) ? settings.Overlay : DefaultOverlayPosition,
+                Reloading = resets.InProgress,
+                OverlayPosition = OverlayPositions.Contains(store.Settings.Overlay) ? store.Settings.Overlay : DefaultOverlayPosition,
                 LiveStart = timer.StartedAt,
                 LastCut = section != null && section == cutSection ? cutRun : null,
                 LastCutShortBy = cutShortBy,
                 Countdown = countdown == null || countdown.IsSuspended || countdown.RemainingSeconds < 0 ?
                     (int?)null : countdown.RemainingSeconds,
                 Status = DescribeStatus(connected, selected),
-                Detail = reloadInProgress ? "Hold F9 to cancel the reload." : message,
+                Detail = resets.InProgress ? "Hold F9 to cancel the reload." : message,
                 ShortcutWarning = shortcutWarning
             };
         }
@@ -153,8 +153,8 @@ internal static partial class RepeatCorner
 
         private static string DescribeStatus(bool connected, Save selected)
         {
-            if (reloadWaitingForFocus) return "Switch back to ACC to continue";
-            if (reloadInProgress) return "Resetting · " + stage;
+            if (resets.WaitingForFocus) return "Switch back to ACC to continue";
+            if (resets.InProgress) return "Resetting · " + resets.Stage;
             if (countdown != null)
             {
                 if (countdown.IsSuspended) return "Loop paused · return to driving";

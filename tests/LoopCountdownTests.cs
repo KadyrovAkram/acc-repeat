@@ -3,6 +3,7 @@ using static RepeatCorner;
 
 namespace ACCRepeat.Tests
 {
+    [Collection(EngineStatics.Name)]
     public class LoopCountdownTests
     {
         [Fact]

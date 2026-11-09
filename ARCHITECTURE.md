@@ -43,11 +43,19 @@ flowchart LR
 
 The app runs two threads. The **engine thread** owns everything that touches ACC or the settings: it polls telemetry, the wheel and hotkeys every 15 ms and runs resets. The **UI thread** runs the WinForms window and the overlay. The UI never mutates engine state directly. It enqueues commands into a `ConcurrentQueue<Action>` that the engine drains each tick, and it renders from a `DeskSnapshot` that the engine publishes as a fresh immutable object (`DesktopSession.cs`). That one rule removes most locking: each piece of state has exactly one thread that writes it.
 
+Inside the engine, three objects have the state that matters most:
+
+- **`GameConnection`** (`GameConnection.cs`) owns the ACC window handle, where its client area is on screen, the `MenuLayout` for that size, and the shared-memory reads (`ReadTelemetry`, `PracticeStatus`).
+- **`RetryController`** (`RetryController.cs`) runs a reset and owns its progress: the current step, whether a reset is running or waiting for ACC to come back to the foreground, and the time spent away.
+- **`SettingsStore`** (`SettingsStore.cs`) owns the pins, timing lines, run history and preferences, and reads and writes `ACCRepeat.settings.json`.
+
+`RepeatCorner.cs` creates one of each when the app starts and passes them to the code that needs them. `RetryController` gets everything it uses through its constructor: the game window (`IGameWindow`), screen capture (`IMenuScreen`), mouse and keyboard (`IGameInput`), a clock (`IClock`) and the rest of the engine (`IResetHost`). That's what lets the tests drive a full reset against a simulated game.
+
 The console build (`Build.ps1 -Console`) runs the same engine loop without the window, which made it a cheap way to debug the engine early on.
 
 ## Reading the game's live data
 
-ACC publishes telemetry through three named memory-mapped files: `Local\acpmf_graphics`, `Local\acpmf_physics` and `Local\acpmf_static`. `ReadTelemetry` (`SectionTiming.cs`) opens each page read-only and reads a handful of fields at fixed byte offsets from Kunos's shared memory layout (v1.8.12): game status, session type, normalized lap position (0 to 1), distance, speed, track name, and the player car's world coordinates.
+ACC publishes telemetry through three named memory-mapped files: `Local\acpmf_graphics`, `Local\acpmf_physics` and `Local\acpmf_static`. `GameConnection.ReadTelemetry` (`GameConnection.cs`) opens each page read-only and reads a handful of fields at fixed byte offsets from Kunos's shared memory layout (v1.8.12): game status, session type, normalized lap position (0 to 1), distance, speed, track name, and the player car's world coordinates.
 
 Every read is validated before it's used. The frame is discarded unless ACC is live in a solo practice session and the values are in range. The page can disappear at any moment when ACC closes, so I/O exceptions mean "no frame" rather than a crash.
 
@@ -65,7 +73,7 @@ ACC marks every lap invalid as soon as a save loads, so its own track-limits ver
 
 ## Resetting by driving the menus
 
-ACC has no API for loading a save, so a reset does what a person would: quit the session, open **Saved Games**, select **Play** on the right row, then select **Drive**. `Retry` and `ExitPracticeForRetry` (`RepeatCorner.cs`) run this as a sequence of named steps. Every step waits until the expected menu is recognized before clicking, with a timeout. A reset never clicks blind, and when something goes wrong it stops and reports which step failed.
+ACC has no API for loading a save, so a reset does what a person would: quit the session, open **Saved Games**, select **Play** on the right row, then select **Drive**. `RetryController` (`RetryController.cs`) runs this as a sequence of named steps. Every step waits until the expected menu is recognized before clicking, with a timeout. A reset never clicks blind, and when something goes wrong it stops and reports which step failed.
 
 Choosing the save is file-based. ACC writes each save as JSON in `Documents\Assetto Corsa Competizione\Savegames`. A pin is identified by slot, creation date and track, so a newer save in a different slot doesn't displace it, and a save that ACC overwrote in the same slot is detected rather than loaded by mistake (`SelectSave`).
 
@@ -92,9 +100,9 @@ Each reset step, the ACC window size, every menu recognized (with how long it to
 
 ## Testing
 
-The xUnit project in `tests/` compiles the app's sources directly and covers the logic that doesn't need ACC running: save selection and pin renames, crossing interpolation and lap wrap, teleport and interruption handling, driven distance, cut detection and pruning, run history and PB promotion, the loop countdown, track map picking and `.bin` import, all bundled maps, and menu layout geometry and signature matching. CI runs the build and the tests on `windows-latest` for every push and pull request.
+The xUnit project in `tests/` compiles the app's sources directly and covers the logic that doesn't need ACC running: save selection and pin renames, crossing interpolation and lap wrap, teleport and interruption handling, driven distance, cut detection and pruning, run history and PB promotion, the loop countdown, track map picking and `.bin` import, all bundled maps, menu layout geometry and signature matching, loading and saving settings, and the reset itself. The reset tests run `RetryController` against `SimulatedAcc`, a fake that shows one menu at a time, reacts to clicks on the menu buttons and keeps time on a clock that only moves when the reset sleeps. They check the order of clicks, that Saved Games is clicked at most three times, that a menu that never appears stops the reset and names the step, and that F9, a covered Play button, a changed save and time spent away from ACC are handled. CI runs the build and the tests on `windows-latest` for every push and pull request.
 
-What the tests can't cover is the conversation with the real game: screen capture, synthetic input and live shared memory. Those are checked by hand in ACC.
+What the tests can't cover is the conversation with the real game: the real screen capture, synthetic input and live shared memory behind those interfaces. Those are checked by hand in ACC.
 
 ## Tradeoffs and limitations
 
@@ -103,4 +111,4 @@ What the tests can't cover is the conversation with the real game: screen captur
 - **Windowed or borderless only for the overlay.** The overlay is a layered, click-through window above ACC. Exclusive fullscreen doesn't allow other windows on top, so the overlay can't appear there.
 - **Synthetic input needs a clear view.** Clicks go to screen coordinates, so another window covering ACC's **Play** button would receive the click. The tool checks which window is under the button before clicking and stops instead of clicking the wrong thing.
 - **.NET Framework 4.x and `csc`.** The app builds with the C# compiler that ships with Windows, so anyone can build it without installing an SDK. The cost is C# 5 syntax in the app and `JavaScriptSerializer` instead of a modern JSON library. Moving to .NET 8 is possible but would need careful retesting of the overlay, DPI handling and `System.Speech`.
-- **Global static state.** The engine is a `static partial class` whose state (`game`, `stage`, `reloadInProgress`, `settings`, the loop fields) lives in static fields. It works because one thread owns that state, but it means tests share state and must run one at a time, and the reset logic can't be tested without a real game window. Splitting this into objects such as a game connection, a reset controller and a settings store, passed in where they're needed, is the main refactoring still to do.
+- **Some engine state is still static.** The game connection, the reset and the settings are objects that tests create for themselves, and those tests run in parallel. `RepeatCorner` is still a `static partial class`, though. It holds the one instance of each object, and the hands-free loop, track map cache, wheel binding, overlay flags and the last cut run are still static fields. Tests that touch the loop or the track maps share one xUnit collection (`EngineStatics`), so they run one at a time. Moving those into objects the same way is the next step.
