@@ -16,7 +16,7 @@ internal static partial class RepeatCorner
         private readonly PillButton importMap = new PillButton("Import map…");
         private readonly PillButton placeStart = new PillButton("Start");
         private readonly PillButton placeFinish = new PillButton("Finish");
-        private readonly PillButton save = new PillButton("Save markers") { Primary = true };
+        private readonly PillButton save = new PillButton("Save lines") { Primary = true };
         private readonly Label positions = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false, AutoEllipsis = true };
         private readonly Label loadLegend = new Label
         {
@@ -35,7 +35,7 @@ internal static partial class RepeatCorner
             canvas.Map = view.Map;
             ShowLoadPosition(view.LoadPosition);
 
-            Text = "Place markers · " + (view.TrackName ?? track);
+            Text = "Timing lines · " + (view.TrackName ?? track);
             BackColor = Theme.Surface;
             ForeColor = Theme.Text;
             Font = font;
@@ -223,7 +223,7 @@ internal static partial class RepeatCorner
 
         private string Problem()
         {
-            if (!canvas.Start.HasValue || !canvas.Finish.HasValue) return "Place both markers.";
+            if (!canvas.Start.HasValue || !canvas.Finish.HasValue) return "Place both timing lines.";
             double span = SectionTimer.ForwardDistance(canvas.Start.Value, canvas.Finish.Value);
             if (span < 0.0002 || span >= 0.5) return "The finish must come after the start, within half a lap.";
             return null;
@@ -245,7 +245,7 @@ internal static partial class RepeatCorner
             double start = canvas.Start.Value, finish = canvas.Finish.Value;
             string name = track;
             session.Post(() => ApplyMarkers(name, start, finish,
-                string.Format("Markers placed on the map: start {0:0.00%}, finish {1:0.00%}.", start, finish)));
+                string.Format("Timing lines placed on the map: start {0:0.00%}, finish {1:0.00%}.", start, finish)));
             DialogResult = DialogResult.OK;
         }
     }
@@ -440,7 +440,7 @@ internal static partial class RepeatCorner
             if (!UpdateTransform(36 * dpi))
             {
                 string message = "No map of " + (Map == null ? "this track" : Map.Track) + " yet.\n\n" +
-                    "Import a map file or drive a lap with Repeat Corner open.";
+                    "Import a map file or drive a lap with ACC Repeat open.";
                 TextRenderer.DrawText(graphics, message, Font, ClientRectangle, Theme.Muted,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
                 return;

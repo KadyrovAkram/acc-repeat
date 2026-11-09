@@ -10,7 +10,7 @@ using System.Threading;
 internal static partial class RepeatCorner
 {
     private const string GameProcess = "AC2-Win64-Shipping";
-    private const string PlayCovered = "Another window is covering the checkpoint's Play button. Move it away and retry.";
+    private const string PlayCovered = "Another window is covering the save's Play button. Move it away and reset again.";
     private const int HotkeyMessage = 0x0312;
     private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
     private static IntPtr game;
@@ -42,11 +42,11 @@ internal static partial class RepeatCorner
     private static int RunEngine(DesktopSession desktop)
     {
         bool exists;
-        using (var instance = new Mutex(true, @"Local\ACCRepeatCorner", out exists))
+        using (var instance = new Mutex(true, @"Local\ACCRepeat", out exists))
         {
             if (!exists)
             {
-                const string message = "ACC Repeat Corner is already running. Close the other instance and reopen this one.";
+                const string message = "ACC Repeat is already running. Close the other instance and reopen this one.";
                 if (desktop == null) Console.WriteLine(message);
                 else desktop.Fail(message);
                 return 1;
@@ -59,7 +59,7 @@ internal static partial class RepeatCorner
                     Console.WriteLine(message + " Press Enter to close.");
                     Console.ReadLine();
                 }
-                else desktop.Fail(message + " Free the shortcut and reopen Repeat Corner.");
+                else desktop.Fail(message + " Free the shortcut and reopen ACC Repeat.");
                 return 1;
             }
             bool startKey = RegisterHotKey(IntPtr.Zero, 2, 0x4006, 0x4B);
@@ -73,15 +73,15 @@ internal static partial class RepeatCorner
                 PruneAllCuts();
                 if (desktop == null)
                 {
-                    Console.Title = "ACC Repeat Corner";
-                    Console.WriteLine("Ctrl+Shift+J: retry the selected Practice save while ACC is focused.");
+                    Console.Title = "ACC Repeat";
+                    Console.WriteLine("Ctrl+Shift+J: reset to the selected Practice save while ACC is focused.");
                     Console.WriteLine("Ctrl+Shift+K / Ctrl+Shift+L: mark the section start / finish.");
                     if (!startKey || !finishKey)
                         Console.WriteLine("One or more section hotkeys are already in use.");
                     Console.WriteLine("Tap F9 to turn off loops. Hold F9 to cancel a reload in progress.");
                     Console.WriteLine("English ACC menus: 1080p, 1440p, 1440 x 900, or 2880 x 1800.");
                     Console.WriteLine("Type 'help' for console commands.");
-                    Console.WriteLine("Active checkpoint: " + (settings.ActiveCheckpoint ?? "latest save"));
+                    Console.WriteLine("Active save: " + (settings.ActiveCheckpoint ?? "latest save"));
                     StartConsoleInput();
                 }
                 else
@@ -137,7 +137,7 @@ internal static partial class RepeatCorner
     private static bool TryRetry(bool keyboard, Save expected = null)
     {
         if (!FindGame() || (expected != null && game != loopWindow)) return false;
-        if (expected != null) Console.WriteLine("Auto-retrying...");
+        if (expected != null) Console.WriteLine("Auto-resetting...");
         CancelLoopCountdown();
         timer.Reset();
         reloadInProgress = true;
@@ -148,7 +148,7 @@ internal static partial class RepeatCorner
         try { Retry(keyboard, expected); }
         catch (Exception error)
         {
-            DisableLoop("retry stopped");
+            DisableLoop("reset stopped");
             ReportStatus("Stopped while " + stage + ". " + error.Message);
         }
         finally
@@ -180,12 +180,12 @@ internal static partial class RepeatCorner
             throw new InvalidOperationException("The selected save changed. Enable the loop again for the new save.");
         if (loopSave != null && !loopSave.SameSave(checkpoint))
             DisableLoop("the selected save changed");
-        Console.WriteLine("Retrying " + checkpoint.Label + "...");
+        Console.WriteLine("Resetting to " + checkpoint.Label + "...");
         EnsureGame();
         if (!Matches(layout.SavedTitle)) ExitPracticeForRetry(checkpoint);
-        stage = "selecting Play on the checkpoint row";
+        stage = "selecting Play on the save's row";
         Click(CheckpointPlayButton(checkpoint), layout.SavedTitle, checkpoint);
-        WaitFor("restored checkpoint and Drive button", layout.Pause, 90);
+        WaitFor("restored save and Drive button", layout.Pause, 90);
         stage = "selecting Drive";
         Click(layout.DriveButton, layout.Pause);
         int driveFocusVersion = reloadFocusVersion;
@@ -222,7 +222,7 @@ internal static partial class RepeatCorner
         if (status != 2 && status != 3)
             throw new InvalidOperationException("Start in solo Free Practice or on the Saved Games screen.");
 
-        stage = "checking the checkpoint's Play button";
+        stage = "checking the save's Play button";
         EnsureGame();
         var play = Point.Add(origin, (Size)layout.ToClient(CheckpointPlayButton(checkpoint)));
         if (GetForegroundWindow() == game && WindowFromPoint(play) != game)
@@ -434,14 +434,14 @@ internal static partial class RepeatCorner
         if (GetForegroundWindow() != game)
         {
             if (!reloadInProgress)
-                throw new InvalidOperationException("ACC lost focus. Switch back to ACC and retry.");
+                throw new InvalidOperationException("ACC lost focus. Switch back to ACC and reset again.");
             WaitForReloadFocus();
         }
         var size = ReadClientSize(out origin);
         if (layout == null)
             layout = MenuLayout.Select(size);
         else if (layout.ClientSize != size)
-            throw new InvalidOperationException("The ACC window changed size. Retry from the practice session.");
+            throw new InvalidOperationException("The ACC window changed size. Reset again from the practice session.");
     }
 
     private static Size ReadClientSize(out Point clientOrigin)
@@ -458,7 +458,7 @@ internal static partial class RepeatCorner
     private static void CheckDesktopClosing()
     {
         if (desktopSession != null && desktopSession.IsClosing)
-            throw new OperationCanceledException("Repeat Corner is closing.");
+            throw new OperationCanceledException("ACC Repeat is closing.");
     }
 
     private static void WaitForReloadFocus()
@@ -517,7 +517,7 @@ internal static partial class RepeatCorner
                     {
                         var selected = SelectSave();
                         if (!checkpoint.SameSave(selected) || checkpoint.Row != selected.Row)
-                            throw new InvalidOperationException("The save list changed during retry.");
+                            throw new InvalidOperationException("The save list changed during the reset.");
                     }
                     Point cursor;
                     if ((expected != layout.Pause || PracticeStatus() == 3) &&

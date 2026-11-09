@@ -29,7 +29,7 @@ internal static partial class RepeatCorner
         cutSection = section;
         cutRun = attempt;
         cutShortBy = shortBy;
-        ReportStatus(string.Format("Run not counted: {0:0.00} s, but {1:0} m shorter than your usual line. " +
+        ReportStatus(string.Format("Invalid run: {0:0.00} s, but {1:0} m shorter than your usual line. " +
             "Looks like a cut.", attempt.Seconds, shortBy));
     }
 
@@ -129,7 +129,7 @@ internal static partial class RepeatCorner
             (section.RecentAttempts.Count != 0 || section.BestAttempt != null)).ToArray();
         if (sections.Length != 1)
             throw new InvalidOperationException(sections.Length == 0 ? "There are no runs to remove." :
-                "This drill has runs on more than one track. Pin a checkpoint for the track first.");
+                "This section has runs on more than one track. Pin a save for the track first.");
         var target = sections[0];
         if (best && target.BestAttempt == null) throw new InvalidOperationException("There is no personal best.");
         if (!best && number > target.RecentAttempts.Count) throw new InvalidOperationException("There is no run " + number + ".");
@@ -192,7 +192,7 @@ internal static partial class RepeatCorner
         var sections = settings.Sections
             .Where(section => section.Checkpoint == settings.ActiveCheckpoint && section.BestAttempt != null).ToArray();
         if (sections.Length == 0)
-            Console.WriteLine("No completed timed runs for this drill yet.");
+            Console.WriteLine("No completed timed runs for this section yet.");
         foreach (var section in sections)
         {
             Console.WriteLine("{0} | Personal best: {1}", section.Checkpoint ?? section.Track, DescribeAttempt(section.BestAttempt));

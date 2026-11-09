@@ -154,12 +154,12 @@ internal static partial class RepeatCorner
         private static string DescribeStatus(bool connected, Save selected)
         {
             if (reloadWaitingForFocus) return "Switch back to ACC to continue";
-            if (reloadInProgress) return "Retrying · " + stage;
+            if (reloadInProgress) return "Resetting · " + stage;
             if (countdown != null)
             {
                 if (countdown.IsSuspended) return "Loop paused · return to driving";
                 return countdown.RemainingSeconds < 0 ? "Announcing result" :
-                    "Auto-retry in " + countdown.RemainingSeconds + " s";
+                    "Auto-reset in " + countdown.RemainingSeconds + " s";
             }
             if (loopSave != null) return "Loop armed";
             if (!connected) return "Start ACC to use the loop";

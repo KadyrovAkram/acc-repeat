@@ -41,7 +41,7 @@ internal static partial class RepeatCorner
         CancelLoopCountdown();
         loopSave = save;
         loopDelay = delay;
-        ReportStatus(string.Format("Hands-free loop armed for {0}. Auto-retry starts {1} s after the result callout.",
+        ReportStatus(string.Format("Hands-free loop armed for {0}. Auto-reset starts {1} s after the result callout.",
             settings.ActiveCheckpoint ?? save.Label, delay));
     }
 
@@ -107,7 +107,7 @@ internal static partial class RepeatCorner
             return;
         }
         if (countdown.Resume(now))
-            Console.WriteLine("Auto-retry countdown resumed.");
+            Console.WriteLine("Auto-reset countdown resumed.");
 
         int? tick = countdown.Update(now, resultAnnouncement == null || resultAnnouncement.IsCompleted);
         if (!tick.HasValue) return;
@@ -121,7 +121,7 @@ internal static partial class RepeatCorner
         }
         else
         {
-            Console.WriteLine("Auto-retry in {0} s. Tap F9 to cancel.", tick.Value);
+            Console.WriteLine("Auto-reset in {0} s. Tap F9 to cancel.", tick.Value);
             if (tick.Value <= 3) SpeakLoop(tick.Value.ToString());
         }
     }
@@ -131,7 +131,7 @@ internal static partial class RepeatCorner
         if (!countdown.Suspend(now)) return;
         resultAnnouncement = null;
         CancelLoopSpeech();
-        Console.WriteLine("Auto-retry paused. Return to live driving in ACC to continue.");
+        Console.WriteLine("Auto-reset paused. Return to live driving in ACC to continue.");
     }
 
     private static void DisableLoop(string reason)

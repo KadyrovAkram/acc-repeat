@@ -35,7 +35,7 @@ internal static partial class RepeatCorner
                     case "pin": PinSave(args); break;
                     case "use": UseCheckpoint(args); break;
                     case "latest": UseLatest(); break;
-                    case "checkpoints": PrintCheckpoints(); break;
+                    case "pins": PrintCheckpoints(); break;
                     case "wheel": ConfigureWheel(args); break;
                     case "section": PrintSections(); break;
                     case "history": ConfigureHistory(args); break;
@@ -62,19 +62,19 @@ internal static partial class RepeatCorner
     private static void PrintHelp()
     {
         Console.WriteLine("saves                  List the ACC saves in menu order");
-        Console.WriteLine("pin <number> <name>    Name or rename a saved checkpoint and make it active");
-        Console.WriteLine("checkpoints            List pins and show the active checkpoint");
-        Console.WriteLine("use <name>             Activate a named checkpoint");
+        Console.WriteLine("pin <number> <name>    Pin or rename a save and make it active");
+        Console.WriteLine("pins                   List pins and show the active save");
+        Console.WriteLine("use <name>             Activate a pinned save");
         Console.WriteLine("latest                 Switch back to the newest save");
         Console.WriteLine("wheel bind             Learn the next wheel or controller button you press");
         Console.WriteLine("wheel clear            Remove the wheel binding");
         Console.WriteLine("wheel                  Show the wheel binding");
-        Console.WriteLine("section                Show timing markers for the active drill");
+        Console.WriteLine("section                Show the timing lines for the active section");
         Console.WriteLine("history                Show the personal best and last five runs");
         Console.WriteLine("history remove <1-5>   Remove a run you don't want counted (numbers from 'history')");
         Console.WriteLine("history remove best    Remove the personal best");
-        Console.WriteLine("loop on [seconds]      Enable auto-retry after a timed finish (default 3 seconds)");
-        Console.WriteLine("loop off               Disable auto-retry");
+        Console.WriteLine("loop on [seconds]      Enable auto-reset after a timed finish (default 3 seconds)");
+        Console.WriteLine("loop off               Disable auto-reset");
         Console.WriteLine("loop                   Show the current loop status");
         Console.WriteLine("quit                   Close the tool");
     }

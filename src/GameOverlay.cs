@@ -60,7 +60,7 @@ internal static partial class RepeatCorner
             const int Layered = 0x80000, Transparent = 0x20, ToolWindow = 0x80, NoActivate = 0x08000000, TopMost = 0x8;
             CreateHandle(new CreateParams
             {
-                Caption = "Repeat Corner overlay",
+                Caption = "ACC Repeat overlay",
                 Style = unchecked((int)0x80000000),
                 ExStyle = Layered | Transparent | ToolWindow | NoActivate | TopMost,
                 Width = 1, Height = 1
@@ -171,7 +171,7 @@ internal static partial class RepeatCorner
         // [caption, value, delta, footer, accent: "red" | "green" | "amber", value style: "time" | "text", delta colour]
         internal static string[] Describe(DeskSnapshot view)
         {
-            string loop = view.Countdown.HasValue ? "Auto-retry in " + view.Countdown.Value + " s" :
+            string loop = view.Countdown.HasValue ? "Auto-reset in " + view.Countdown.Value + " s" :
                 view.LoopArmed ? "Loop armed" : null;
             string personalBest = view.Best == null ? null : "PB " + view.Best.Seconds.ToString("0.000");
             string footer = string.Join("   ·   ", new[] { loop, personalBest }.Where(part => part != null).ToArray());
@@ -186,12 +186,12 @@ internal static partial class RepeatCorner
                 return new[] { "LIVE", elapsed.ToString("0.0"), "", footer, "red", "time", "" };
             }
             if (view.LastCut != null)
-                return new[] { "CUT · NOT COUNTED", view.LastCut.Seconds.ToString("0.000"),
+                return new[] { "INVALID · CUT", view.LastCut.Seconds.ToString("0.000"),
                     "−" + view.LastCutShortBy.ToString("0") + " m", footer, "amber", "time", "amber" };
 
             var last = view.Recent.FirstOrDefault();
             if (last == null)
-                return new[] { "READY", "—", "", footer.Length == 0 ? "Cross both markers to time a run" : footer, "red", "time", "" };
+                return new[] { "READY", "—", "", footer.Length == 0 ? "Cross both timing lines to time a run" : footer, "red", "time", "" };
 
             bool isBest = view.Best != null && last.Seconds == view.Best.Seconds;
             string delta = "", deltaColour = "amber";
@@ -255,7 +255,7 @@ internal static partial class RepeatCorner
                             using (var deltaBrush = new SolidBrush(Named(content[6])))
                                 graphics.DrawString(content[2], delta, deltaBrush,
                                     new RectangleF(left, 18 * scale, right - left, 44 * scale), nearRight);
-                        var footerColour = content[3].StartsWith("Auto-retry") ? Theme.Amber :
+                        var footerColour = content[3].StartsWith("Auto-reset") ? Theme.Amber :
                             content[3].StartsWith("Loop armed") ? Theme.Green : Theme.Muted;
                         using (var footerBrush = new SolidBrush(footerColour))
                             graphics.DrawString(content[3], footer, footerBrush,

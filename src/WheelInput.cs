@@ -28,7 +28,7 @@ internal static partial class RepeatCorner
             if (!found)
                 throw new InvalidOperationException("Windows did not report a joystick or wheel. Connect it and try again.");
             learnWheel = Stopwatch.StartNew();
-            ReportStatus("Release any held buttons, then press your Retry button within 15 seconds.");
+            ReportStatus("Release any held buttons, then press your Reset button within 15 seconds.");
         }
         else if (action.Equals("clear", StringComparison.OrdinalIgnoreCase))
         {
@@ -90,7 +90,7 @@ internal static partial class RepeatCorner
             try
             {
                 StoreSettings();
-                ReportStatus(string.Format("Retry bound to {0}, button {1}.", device, newBinding.Button + 1));
+                ReportStatus(string.Format("Reset bound to {0}, button {1}.", device, newBinding.Button + 1));
             }
             catch (Exception error)
             {
