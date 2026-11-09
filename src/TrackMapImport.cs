@@ -48,7 +48,7 @@ internal static partial class RepeatCorner
     {
         // The binary format has no track ID in its header. Use the original filename.
         if (!SameTrack(Path.GetFileName(path), track + ".bin"))
-            throw new InvalidDataException("Choose the " + track + ".bin file for this checkpoint.");
+            throw new InvalidDataException("Choose the " + track + ".bin file for this save.");
 
         const int headerSize = 14, pointSize = 12, maxFileSize = 4 * 1024 * 1024;
         using (var stream = File.OpenRead(path))

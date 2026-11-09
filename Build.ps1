@@ -10,7 +10,7 @@ $speech = Join-Path $env:WINDIR 'Microsoft.NET/assembly/GAC_MSIL/System.Speech/v
 
 $bin = Join-Path $PSScriptRoot 'bin'
 New-Item -ItemType Directory -Path $bin -Force | Out-Null
-$exe = Join-Path $bin 'ACC Repeat Corner.exe'
+$exe = Join-Path $bin 'ACC Repeat.exe'
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' -File |
     ForEach-Object { $_.FullName })
 
@@ -18,7 +18,7 @@ $target = $exe
 $entryPoint = 'PracticeDeskApp'
 $targetKind = 'winexe'
 if ($Console) {
-    $target = Join-Path $bin 'ACC Repeat Corner - Console.exe'
+    $target = Join-Path $bin 'ACC Repeat - Console.exe'
     $entryPoint = 'RepeatCorner'
     $targetKind = 'exe'
 }

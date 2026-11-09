@@ -29,7 +29,7 @@ internal static partial class RepeatCorner
     {
         private readonly DesktopSession session;
         private readonly Timer refreshTimer = new Timer { Interval = 50 };
-        private readonly DarkPicker checkpoint = new DarkPicker("Active checkpoint");
+        private readonly DarkPicker checkpoint = new DarkPicker("Active save");
         private readonly DarkPicker overlayPosition = new DarkPicker("In-game overlay position");
         private readonly PillButton pinButton = new PillButton("Pin a save…");
         private readonly PillButton loopButton = new PillButton("Arm loop");
@@ -48,7 +48,7 @@ internal static partial class RepeatCorner
         private readonly Label best = Caption("Personal best   —", 11);
         private readonly Label entry = Caption("—", 17);
         private readonly Label exit = Caption("—", 17);
-        private readonly Label emptyHistory = Caption("Cross both timing markers to record a run.", 10);
+        private readonly Label emptyHistory = Caption("Cross both timing lines to record a run.", 10);
         private readonly AttemptList history = new AttemptList { Dock = DockStyle.Fill, Visible = false };
         private TableLayoutPanel wheelRow;
         private GameOverlay overlay;
@@ -61,7 +61,7 @@ internal static partial class RepeatCorner
         {
             this.session = session;
             SuspendLayout();
-            Text = "ACC Repeat Corner";
+            Text = "ACC Repeat";
             Font = new Font("Segoe UI", 10);
             BackColor = Theme.Background;
             ForeColor = Theme.Text;
@@ -138,12 +138,12 @@ internal static partial class RepeatCorner
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-            var mark = Caption("RC", 11);
+            var mark = Caption("AR", 11);
             mark.BackColor = Theme.Red;
             mark.Font = new Font("Segoe UI", 11, FontStyle.Bold | FontStyle.Italic);
             mark.TextAlign = ContentAlignment.MiddleCenter;
             mark.Margin = new Padding(0, 4, 7, 4);
-            var title = Caption("Practice desk", 15);
+            var title = Caption("ACC Repeat", 15);
             title.Margin = new Padding(8, 0, 0, 0);
             connection.TextAlign = ContentAlignment.MiddleRight;
             header.Controls.Add(mark, 0, 0);
@@ -157,7 +157,7 @@ internal static partial class RepeatCorner
             var sidebar = Stack(1);
             sidebar.Padding = new Padding(18, 10, 16, 8);
             sidebar.BackColor = Theme.Surface;
-            AddRow(sidebar, SectionHeading("Active checkpoint"), 26);
+            AddRow(sidebar, SectionHeading("Active save"), 26);
             checkpoint.Dock = DockStyle.Fill;
             AddRow(sidebar, checkpoint, 36);
             checkpointDetail.ForeColor = Theme.Muted;
@@ -187,7 +187,7 @@ internal static partial class RepeatCorner
             loopButton.Primary = true;
             AddRow(sidebar, loopButton, 38);
 
-            AddRow(sidebar, SectionHeading("Wheel retry"), 36);
+            AddRow(sidebar, SectionHeading("Wheel reset"), 36);
             wheel.ForeColor = Theme.Muted;
             AddRow(sidebar, wheel, 24);
             wheelRow = TwoColumns(bindButton, clearWheel);
@@ -231,7 +231,7 @@ internal static partial class RepeatCorner
             footer.BackColor = Theme.Surface;
             footer.Padding = new Padding(18, 6, 18, 0);
             var keys = new KeyHints(
-                new[] { "Ctrl+Shift+J", "Retry" }, new[] { "Ctrl+Shift+K", "Mark start" },
+                new[] { "Ctrl+Shift+J", "Reset" }, new[] { "Ctrl+Shift+K", "Mark start" },
                 new[] { "Ctrl+Shift+L", "Mark finish" }, new[] { "F9", "Disarm loop" })
             {
                 Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9)
@@ -265,7 +265,7 @@ internal static partial class RepeatCorner
             var available = displayed.AvailableSaves;
             using (var dialog = new Form
             {
-                Text = "Pin or rename a Free Practice checkpoint", BackColor = Theme.Surface, ForeColor = Theme.Text,
+                Text = "Pin or rename a Free Practice save", BackColor = Theme.Surface, ForeColor = Theme.Text,
                 Font = Font, ClientSize = new Size(495, 205), FormBorderStyle = FormBorderStyle.FixedSingle, Icon = Icon,
                 StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false,
                 ShowInTaskbar = false
@@ -280,7 +280,7 @@ internal static partial class RepeatCorner
                 if (available.Length != 0) saves.SelectedIndex = 0;
                 var name = new TextBox
                 {
-                    Dock = DockStyle.Fill, AccessibleName = "Checkpoint name", MaxLength = 64,
+                    Dock = DockStyle.Fill, AccessibleName = "Pin name", MaxLength = 64,
                     BackColor = Theme.Inset, ForeColor = Theme.Text, BorderStyle = BorderStyle.None
                 };
                 var nameField = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Inset, Margin = new Padding(0, 2, 6, 2), Padding = new Padding(10, 9, 10, 0) };
@@ -295,14 +295,14 @@ internal static partial class RepeatCorner
                 };
                 name.GotFocus += (source, focus) => nameField.Invalidate();
                 name.LostFocus += (source, focus) => nameField.Invalidate();
-                var accept = new PillButton("Save checkpoint") { Primary = true, Enabled = false };
+                var accept = new PillButton("Save pin") { Primary = true, Enabled = false };
                 accept.DialogResult = DialogResult.OK;
                 var cancel = new PillButton("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;
                 name.TextChanged += (source, change) => accept.Enabled = name.Text.Trim().Length != 0 && saves.SelectedIndex >= 0;
                 AddRow(body, SectionHeading("Free Practice save"), 25);
                 AddRow(body, saves, 38);
-                AddRow(body, SectionHeading("Checkpoint name"), 30);
+                AddRow(body, SectionHeading("Pin name"), 30);
                 AddRow(body, nameField, 38);
                 AddRow(body, TwoColumns(cancel, accept), 40);
                 dialog.Controls.Add(body);
@@ -351,7 +351,7 @@ internal static partial class RepeatCorner
             if (view.Error != null)
             {
                 SetActions(false);
-                status.Text = "Repeat Corner could not start";
+                status.Text = "ACC Repeat could not start";
                 status.ForeColor = Theme.Amber;
                 detail.Text = view.Error;
                 return;
@@ -420,12 +420,12 @@ internal static partial class RepeatCorner
             best.ForeColor = Theme.Muted;
             if (last != null && last.PreviousBestDelta.HasValue)
             {
-                best.Text = string.Format("{0:+0.000;-0.000;0.000} s vs previous best   ·   {1}", last.PreviousBestDelta.Value, personalBest);
+                best.Text = string.Format("Delta {0:+0.000;-0.000;0.000} s to previous PB   ·   {1}", last.PreviousBestDelta.Value, personalBest);
                 best.ForeColor = last.PreviousBestDelta.Value < 0 ? Theme.Green : Theme.Amber;
             }
             else if (last != null && view.Best != null && !IsBest(last, view.Best))
             {
-                best.Text = string.Format("{0:+0.000;-0.000;0.000} s off best   ·   {1}", last.Seconds - view.Best.Seconds, personalBest);
+                best.Text = string.Format("Delta {0:+0.000;-0.000;0.000} s to PB   ·   {1}", last.Seconds - view.Best.Seconds, personalBest);
                 best.ForeColor = Theme.Amber;
             }
             else if (IsBest(last, view.Best))
@@ -440,9 +440,9 @@ internal static partial class RepeatCorner
             bool hasAttempts = view.Recent.Length != 0;
             history.Visible = hasAttempts;
             emptyHistory.Visible = !hasAttempts;
-            emptyHistory.Text = view.Finish.HasValue ? "Cross both timing markers to record a run." :
+            emptyHistory.Text = view.Finish.HasValue ? "Cross both timing lines to record a run." :
                 view.Start.HasValue ? "In ACC, press Ctrl+Shift+L after the exit to mark the finish." :
-                "Select Place on map to click the markers onto the track, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
+                "Select Place on map to click the timing lines onto the track, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
         }
 
         private static bool IsBest(Attempt run, Attempt best)

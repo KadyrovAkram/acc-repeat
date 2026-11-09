@@ -9,7 +9,7 @@ using System.Web.Script.Serialization;
 internal static partial class RepeatCorner
 {
     private const int MapBins = 1000;
-    private static readonly string MapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RepeatCorner.maps.json");
+    private static readonly string MapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ACCRepeat.maps.json");
     private static readonly JavaScriptSerializer MapJson = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
     private static List<TrackMap> trackMaps = new List<TrackMap>();
     private static bool mapsDirty;

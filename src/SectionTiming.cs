@@ -32,7 +32,7 @@ internal static partial class RepeatCorner
                 throw new InvalidOperationException("Mark the timing line on track in solo Free Practice.");
             var pin = ActiveCheckpoint();
             if (pin != null && !SameTrack(pin.Track, frame.Track))
-                throw new InvalidOperationException("Load the active checkpoint's track before marking the section.");
+                throw new InvalidOperationException("Load the active save's track before marking the section.");
 
             var section = CurrentSection(frame.Track);
             if (start)
@@ -52,9 +52,9 @@ internal static partial class RepeatCorner
             }
             StoreSettings();
             timer.Reset();
-            DisableLoop("timing markers changed");
+            DisableLoop("timing lines changed");
             ReportStatus(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
-                "Timing finish marked. Retry and cross both marks to record a run.");
+                "Timing finish marked. Reset and cross both timing lines to record a run.");
         }
         catch (Exception error)
         {
@@ -71,7 +71,7 @@ internal static partial class RepeatCorner
         finish = WrapPosition(finish);
         var pin = ActiveCheckpoint();
         if (pin != null && !SameTrack(pin.Track, track))
-            throw new InvalidOperationException("Load the active checkpoint's track before setting the section.");
+            throw new InvalidOperationException("Load the active save's track before setting the section.");
         double span = SectionTimer.ForwardDistance(start, finish);
         if (span < 0.0002 || span >= 0.5)
             throw new InvalidOperationException("The finish must be ahead of the start and within half a lap.");
@@ -91,7 +91,7 @@ internal static partial class RepeatCorner
         SetFinish(section, finish);
         StoreSettings();
         timer.Reset();
-        DisableLoop("timing markers changed");
+        DisableLoop("timing lines changed");
         ReportStatus(message);
     }
 
@@ -115,7 +115,7 @@ internal static partial class RepeatCorner
     {
         var sections = settings.Sections.Where(section => section.Checkpoint == settings.ActiveCheckpoint).ToArray();
         if (sections.Length == 0)
-            Console.WriteLine("No markers for this drill. In ACC, press Ctrl+Shift+K at the start and Ctrl+Shift+L at the exit.");
+            Console.WriteLine("No timing lines for this section. In ACC, press Ctrl+Shift+K at the start and Ctrl+Shift+L at the exit.");
         foreach (var section in sections)
             Console.WriteLine("{0}: start {1:P2}, finish {2}", section.Track, section.Start,
                 section.Finish.HasValue ? section.Finish.Value.ToString("P2") : "unmarked");
@@ -140,7 +140,7 @@ internal static partial class RepeatCorner
         if (cut.HasValue)
         {
             ReportCut(sectionOnTrack, result, cut.Value);
-            StartLoopCountdown(sectionOnTrack, "Cut. Not counted.");
+            StartLoopCountdown(sectionOnTrack, "Invalid. Cut.");
             return;
         }
         ReportAttempt(sectionOnTrack, result);

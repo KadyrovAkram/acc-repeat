@@ -340,7 +340,7 @@ internal static partial class RepeatCorner
             var lines = new string[recent.Length];
             for (int index = 0; index < recent.Length; index++)
                 lines[index] = string.Format("{0}: {1:0.000} seconds, {2}", RunLabel(index), recent[index].Seconds,
-                    IsPersonalBest(recent[index]) ? "personal best" : DeltaText(recent[index]) + " to best");
+                    IsPersonalBest(recent[index]) ? "personal best" : DeltaText(recent[index]) + " delta to personal best");
             AccessibleDescription = string.Join("; ", lines);
             Invalidate();
         }
@@ -415,7 +415,7 @@ internal static partial class RepeatCorner
             using (var bold = new Font(Font, FontStyle.Bold))
             using (var line = new Pen(Theme.Line))
             {
-                string[] headings = { "RUN", "TIME", "VS BEST", "ENTRY", "EXIT" };
+                string[] headings = { "RUN", "TIME", "DELTA", "ENTRY", "EXIT" };
                 for (int index = 0; index < headings.Length; index++)
                     Cell(graphics, headings[index], small, Theme.Muted, columns, index, 0, headerHeight);
                 graphics.DrawLine(line, 0, headerHeight - 1, Width, headerHeight - 1);

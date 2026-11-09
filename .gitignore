@@ -3,4 +3,5 @@
 .vs/
 *.user
 *.log
-RepeatCorner.settings.json*
+ACCRepeat.settings.json*
+ACCRepeat.maps.json*
