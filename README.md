@@ -1,4 +1,4 @@
-# ACC Repeat Corner
+# ACC Repeat
 
 Repeat a chosen stretch of track in Assetto Corsa Competizione without driving a full lap between attempts. Practice a braking zone, a sequence of corners, or a sector. Save your approach in solo Free Practice, then use a shortcut to reload the checkpoint and drive the section again.
 
@@ -6,7 +6,7 @@ Repeat a chosen stretch of track in Assetto Corsa Competizione without driving a
 
 ## Quick start
 
-For the latest Practice desk, map zoom, and checkpoint load marker, [build the Windows app from `main`](#build-on-windows). For a ready-to-run download, get the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat-corner/releases), extract it, and keep the `Maps` folder beside the executable. The current ZIP is **v0.1.0** and has its own [release instructions](https://github.com/KadyrovAkram/acc-repeat-corner/blob/v0.1.0/README.md).
+For the latest Practice desk, map zoom, and checkpoint load marker, [build the Windows app from `main`](#build-on-windows). For a ready-to-run download, get the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat/releases), extract it, and keep the `Maps` folder beside the executable. The current ZIP is **v0.1.0** and has its own [release instructions](https://github.com/KadyrovAkram/acc-repeat/blob/v0.1.0/README.md).
 
 1. Launch `ACC Repeat Corner.exe` and leave the Practice desk open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to your chosen section.
@@ -49,9 +49,9 @@ The amber **Load** diamond shows where your selected checkpoint places the car o
 
 ![The Monza track map with zoom controls, an amber Load diamond, and a highlighted section between the start and finish markers](docs/images/track-map.png)
 
-Repeat Corner includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
+ACC Repeat includes 25 ACC maps and loads the one for your selected checkpoint automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
 
-Use **Import map…** to load a custom Race Element ACC `.bin` for the selected track, keeping its original filename. If you have no map for that track, you can draw one by driving a lap with ACC focused and Repeat Corner open. Imported and recorded maps are saved in `RepeatCorner.maps.json` beside the executable.
+Use **Import map…** to load a custom Race Element ACC `.bin` for the selected track, keeping its original filename. If you have no map for that track, you can draw one by driving a lap with ACC focused and the Practice desk open. Imported and recorded maps are saved in `RepeatCorner.maps.json` beside the executable.
 
 ### Review your runs
 
