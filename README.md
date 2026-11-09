@@ -6,7 +6,9 @@ Repeat any stretch of track you choose in Assetto Corsa Competizione (ACC) witho
 
 ## Quick start
 
-For the latest app window, map zoom, and save load marker, [build the Windows app from `main`](#build-on-windows). For a ready-to-run download, get the Windows ZIP from [GitHub Releases](https://github.com/KadyrovAkram/acc-repeat/releases), extract it, and keep the `Maps` folder beside the executable. The current ZIP is **v0.1.0**, which still names the app `ACC Repeat Corner.exe`, and has its own [release instructions](https://github.com/KadyrovAkram/acc-repeat/blob/v0.1.0/README.md).
+Download the Windows ZIP for the [latest release](https://github.com/KadyrovAkram/acc-repeat/releases/latest) (currently **v0.2.0**), extract it, and keep the `Maps` folder beside `ACC Repeat.exe`. To try changes that haven't been released yet, [build the Windows app from `main`](#build-on-windows).
+
+If you're upgrading from v0.1.0, rename `RepeatCorner.settings.json` to `ACCRepeat.settings.json` and place it next to `ACC Repeat.exe` to keep your pins, timing lines and run history. If you imported or recorded track maps, also rename `RepeatCorner.maps.json` to `ACCRepeat.maps.json`.
 
 1. Launch `ACC Repeat.exe` and leave its window open. You can minimize it while driving.
 2. In ACC, start **Single Player → Free Practice** and drive to the stretch you want to practice.
