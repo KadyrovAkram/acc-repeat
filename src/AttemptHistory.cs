@@ -61,9 +61,9 @@ internal static partial class RepeatCorner
 
     private static void PruneAllCuts()
     {
-        int removed = settings.Sections.Sum(section => PruneCuts(section));
+        int removed = store.Settings.Sections.Sum(section => PruneCuts(section));
         if (removed == 0) return;
-        StoreSettings();
+        store.Save();
         ReportStatus(string.Format("Removed {0} earlier run{1} that look like cuts.", removed, removed == 1 ? "" : "s"));
     }
 
@@ -83,7 +83,7 @@ internal static partial class RepeatCorner
     private static void RemoveAttempt(Section section, Attempt run)
     {
         bool wasBest = DropAttempt(section, run);
-        StoreSettings();
+        store.Save();
         ReportStatus(string.Format("Removed the {0:0.000} s run.{1}", run.Seconds, !wasBest ? "" :
             section.BestAttempt == null ? " No personal best left." :
             string.Format(" Your best is now {0:0.000} s.", section.BestAttempt.Seconds)));
@@ -104,7 +104,7 @@ internal static partial class RepeatCorner
     // Desk: the run object comes from the snapshot, which shares the engine's instances.
     private static void RemoveRun(Attempt run)
     {
-        var section = settings.Sections.Find(candidate => candidate.Checkpoint == settings.ActiveCheckpoint &&
+        var section = store.Settings.Sections.Find(candidate => candidate.Checkpoint == store.Settings.ActiveCheckpoint &&
             (candidate.RecentAttempts.Contains(run) || candidate.BestAttempt == run));
         if (section == null)
             throw new InvalidOperationException("That run is no longer in the history.");
@@ -125,7 +125,7 @@ internal static partial class RepeatCorner
         if (parts.Length != 2 || !parts[0].Equals("remove", StringComparison.OrdinalIgnoreCase) ||
             (!best && (!int.TryParse(parts[1], out number) || number < 1 || number > RecentAttemptLimit)))
             throw new InvalidOperationException("Use 'history', 'history remove <1-5>' or 'history remove best'.");
-        var sections = settings.Sections.Where(section => section.Checkpoint == settings.ActiveCheckpoint &&
+        var sections = store.Settings.Sections.Where(section => section.Checkpoint == store.Settings.ActiveCheckpoint &&
             (section.RecentAttempts.Count != 0 || section.BestAttempt != null)).ToArray();
         if (sections.Length != 1)
             throw new InvalidOperationException(sections.Length == 0 ? "There are no runs to remove." :
@@ -182,15 +182,15 @@ internal static partial class RepeatCorner
         }
         if (desktopSession != null) desktopSession.Note(note);
 
-        try { StoreSettings(); }
+        try { store.Save(); }
         catch (IOException error) { ReportStatus("Could not save attempt history. " + error.Message); }
         catch (UnauthorizedAccessException error) { ReportStatus("Could not save attempt history. " + error.Message); }
     }
 
     private static void PrintHistory()
     {
-        var sections = settings.Sections
-            .Where(section => section.Checkpoint == settings.ActiveCheckpoint && section.BestAttempt != null).ToArray();
+        var sections = store.Settings.Sections
+            .Where(section => section.Checkpoint == store.Settings.ActiveCheckpoint && section.BestAttempt != null).ToArray();
         if (sections.Length == 0)
             Console.WriteLine("No completed timed runs for this section yet.");
         foreach (var section in sections)

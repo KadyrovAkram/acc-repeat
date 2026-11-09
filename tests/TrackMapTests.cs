@@ -146,6 +146,7 @@ namespace ACCRepeat.Tests
         }
     }
 
+    [Collection(EngineStatics.Name)]
     public class BundledTrackMapTests
     {
         public static IEnumerable<object[]> BundledTracks()

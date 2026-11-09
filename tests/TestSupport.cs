@@ -1,12 +1,16 @@
 using Xunit;
 using static RepeatCorner;
 
-// The app keeps its settings, loop state and track maps in static fields, so tests that
-// touch them must not run at the same time.
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
-
 namespace ACCRepeat.Tests
 {
+    // The hands-free loop and the track map cache are still static fields of the engine, so
+    // the tests that touch them run one at a time. Everything else runs in parallel.
+    [CollectionDefinition(Name)]
+    public sealed class EngineStatics
+    {
+        public const string Name = "Engine statics";
+    }
+
     internal static class Telemetry
     {
         public static TelemetryFrame Frame(int packet, double position, double time, double distance, double speed)
