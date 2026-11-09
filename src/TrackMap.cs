@@ -8,10 +8,10 @@ using System.Web.Script.Serialization;
 // Bundled maps, imports, and recordings share one point per 0.1% of the lap.
 internal static partial class RepeatCorner
 {
-    private const int MapBins = 1000;
+    internal const int MapBins = 1000;
     private static readonly string MapsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ACCRepeat.maps.json");
     private static readonly JavaScriptSerializer MapJson = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
-    private static List<TrackMap> trackMaps = new List<TrackMap>();
+    internal static List<TrackMap> trackMaps = new List<TrackMap>();
     private static bool mapsDirty;
     private static int mapVersion, cachedMapVersion = -1;
     private static double nextMapSample, nextMapSave;
@@ -42,7 +42,7 @@ internal static partial class RepeatCorner
     }
 
     // An immutable copy for the desk thread, with the geometry the map dialog needs.
-    private sealed class TrackMapView
+    internal sealed class TrackMapView
     {
         public string Track;
         public double[] X, Z;
@@ -104,7 +104,7 @@ internal static partial class RepeatCorner
         }
     }
 
-    private static TrackMap FindTrackMap(string track)
+    internal static TrackMap FindTrackMap(string track)
     {
         return trackMaps.Find(map => map.Imported && SameTrack(map.Track, track)) ??
             FindBundledTrackMap(track) ??
@@ -112,7 +112,7 @@ internal static partial class RepeatCorner
     }
 
     // Engine thread: a copy is made only when the map gains points or the track changes.
-    private static TrackMapView MapView(string track)
+    internal static TrackMapView MapView(string track)
     {
         if (track == null) return null;
         if (cachedMapView != null && cachedMapVersion == mapVersion && SameTrack(cachedMapView.Track, track))

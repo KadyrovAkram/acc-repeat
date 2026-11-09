@@ -327,7 +327,7 @@ internal static partial class RepeatCorner
         return matched;
     }
 
-    private sealed class Signature
+    internal sealed class Signature
     {
         public readonly int X, Y, Width, Height;
         private readonly byte[] mask;

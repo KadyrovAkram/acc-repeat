@@ -106,7 +106,7 @@ internal static partial class RepeatCorner
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Section CurrentSection(string track)
+    internal static Section CurrentSection(string track)
     {
         return settings.Sections.Find(section => section.Checkpoint == settings.ActiveCheckpoint && SameTrack(section.Track, track));
     }
@@ -196,7 +196,7 @@ internal static partial class RepeatCorner
         catch (ArgumentException) { return null; }
     }
 
-    private sealed class TelemetryFrame
+    internal sealed class TelemetryFrame
     {
         public string Track;
         public int Packet;
@@ -206,7 +206,7 @@ internal static partial class RepeatCorner
         public double X, Z;
     }
 
-    private sealed class SectionTimer
+    internal sealed class SectionTimer
     {
         private Section section;
         private TelemetryFrame previous;

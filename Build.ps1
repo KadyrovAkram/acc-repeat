@@ -22,12 +22,6 @@ if ($Console) {
     $entryPoint = 'RepeatCorner'
     $targetKind = 'exe'
 }
-if ($Test) {
-    $target = Join-Path $bin 'PracticeDrillTests.exe'
-    $entryPoint = 'PracticeDrillTests'
-    $targetKind = 'exe'
-    $sources += Join-Path $PSScriptRoot 'tests/PracticeDrillTests.cs'
-}
 
 & $compiler /nologo /optimize+ /platform:x64 "/target:$targetKind" /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll "/reference:$speech" "/out:$target" "/main:$entryPoint" @sources
 if ($LASTEXITCODE -ne 0) {
@@ -39,9 +33,13 @@ New-Item -ItemType Directory -Path $buildMaps -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Maps') -File |
     Copy-Item -Destination $buildMaps -Force
 
+Write-Output $target
+
 if ($Test) {
-    & $target
-    if ($LASTEXITCODE -ne 0) { throw 'Practice drill checks failed.' }
-} else {
-    Write-Output $target
+    # The xUnit tests compile the same sources against .NET Framework 4.8 and need the .NET SDK.
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+        throw 'Running the tests needs the .NET SDK (https://dotnet.microsoft.com/download).'
+    }
+    & dotnet test (Join-Path $PSScriptRoot 'tests/ACCRepeat.Tests.csproj') --configuration Release --logger 'console;verbosity=normal'
+    if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 }
