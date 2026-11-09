@@ -1,5 +1,7 @@
 # ACC Repeat
 
+[![CI](https://github.com/KadyrovAkram/acc-repeat/actions/workflows/ci.yml/badge.svg)](https://github.com/KadyrovAkram/acc-repeat/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Repeat any stretch of track you choose in Assetto Corsa Competizione (ACC) without driving a full lap between attempts. Practice a braking zone, a single corner, a sequence of corners, or a whole sector. It works like iRacing's Active Reset: save in solo Free Practice just before the section, then press a wheel button to reset to that save and go again. ACC Repeat times the section between a start line and a finish line you set, shows your delta to your personal best (PB), and can reset you automatically after each run.
 
 ![The ACC Repeat window showing a pinned Monza save, timing and loop controls, and five example runs with delta bars](docs/images/practice-desk.png)
@@ -110,7 +112,11 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 & '.\bin\ACC Repeat.exe'
 ```
 
-Run `.\Build.ps1 -Test` to check save identity, wheel button decoding, timing, attempt history, the loop countdown, and menu layout without opening ACC. Run `.\Build.ps1 -Console` to build the command-line version. It uses the same settings file and shortcuts. Type `help` in the console to see its commands.
+Run `.\Build.ps1 -Test` to build the app and run the xUnit tests in `tests/`, which cover save selection, wheel button decoding, section timing, cut detection, attempt history, the loop countdown, track maps, and menu layout without opening ACC. The tests need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0); the app itself doesn't. CI runs the same command on every push and pull request. Run `.\Build.ps1 -Console` to build the command-line version. It uses the same settings file and shortcuts. Type `help` in the console to see its commands.
+
+## How it works
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the tool reads ACC's shared memory, recognizes menus at different resolutions, times sections and spots cut runs, and for the tradeoffs and limitations behind those choices.
 
 ## Compatibility
 
@@ -128,3 +134,8 @@ If you change resolution during a reset, start a new reset from the practice ses
 - Hold **F9** during a reset to cancel it. Close the ACC Repeat window to stop the tool.
 - If the status says **Switch back to ACC to continue**, return to ACC to resume the reset. If it stops because it could not confirm a menu, load the save manually and try again.
 - If the tool stops while selecting a menu button, give it a moment to position the cursor during that step. The message at the bottom reports where it stopped.
+- Each reset step, the menus it recognized, and any failure are written to `ACCRepeat.log` beside `ACC Repeat.exe`. Attach it when you report a problem.
+
+## License
+
+ACC Repeat is released under the [MIT License](LICENSE). The bundled track maps are covered by their own [GPLv3 license](Maps/LICENSE.txt).
