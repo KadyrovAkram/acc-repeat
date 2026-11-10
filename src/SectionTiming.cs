@@ -197,14 +197,21 @@ internal static partial class RepeatCorner
                 startTime = null;
                 return null;
             }
-            if (progress == 0 || progress >= 0.99999) return null;
+            // Distance actually driven in this frame, from speed. ACC's own distance and lap
+            // position follow the track, so they don't get shorter when the car cuts a corner.
+            double driven = (before.Speed + current.Speed) / 7.2 * seconds;
+            if (progress == 0 || progress >= 0.99999)
+            {
+                // A repeated or slightly regressed lap position can't cross a timing line,
+                // but the car can still be moving between these samples.
+                if (startTime.HasValue)
+                    path += driven;
+                return null;
+            }
 
             double toStart = ForwardDistance(before.Position, active.Start);
             double toFinish = ForwardDistance(before.Position, active.Finish.Value);
             bool startCrossed = toStart > 0 && toStart <= progress;
-            // Distance actually driven in this frame, from speed. ACC's own distance and lap
-            // position follow the track, so they don't get shorter when the car cuts a corner.
-            double driven = (before.Speed + current.Speed) / 7.2 * seconds;
             double drivenFrom = 0;
             if (startCrossed && (!startTime.HasValue || toStart <= toFinish))
             {

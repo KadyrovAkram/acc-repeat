@@ -57,5 +57,19 @@ namespace ACCRepeat.Tests
             Assert.NotNull(steady);
             Assert.Equal(6, steady.Path, Precision);
         }
+
+        [Theory]
+        [InlineData(0.101)]
+        [InlineData(0.100999)]
+        public void DistanceIncludesFramesWithoutForwardLapProgress(double position)
+        {
+            timer.Observe(normal, Frame(1, 0.099, 0.0, 0, 72));
+            timer.Observe(normal, Frame(2, 0.101, 0.1, 2, 72));
+            timer.Observe(normal, Frame(3, position, 0.2, 2, 72));
+            var result = timer.Observe(normal, Frame(4, 0.103, 0.3, 4, 72));
+
+            Assert.NotNull(result);
+            Assert.Equal(result.Seconds * 20, result.Path, Precision);
+        }
     }
 }
