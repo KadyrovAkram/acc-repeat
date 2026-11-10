@@ -65,11 +65,13 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 History is stored with the timing lines in `ACCRepeat.settings.json`. Moving either line starts a new history for that section.
 
-### Cut runs are invalidated
+### Experimental track limits
 
-The tool measures how far the car actually drove between the timing lines. If a run is clearly shorter than your recent runs through the section (more than 1% of the distance, or 4 m, whichever is larger), it's treated as a cut and invalidated. The run isn't added to your history or PB. The app says by how much it was short, the in-game overlay shows **Invalid · cut** with the run's time until your next run, and in a loop the voice says "Invalid. Cut." before resetting.
+To try the Brands Hatch pilot, run `python .\tools\install-brands-hatch-limits.py` from the repository root, then start ACC Repeat. The installer converts the pinned [RaceIQ Brands Hatch map](https://github.com/SpeedHQ/RaceIQ/blob/930f65425e9a0c271a6612107deec2f3fec01b3d/shared/data/tracks/acc/brands-hatch.track.svg) into `bin\TrackLimits\brands_hatch.csv`. Restart ACC Repeat after adding the map.
 
-ACC marks every lap invalid as soon as a save loads, so the tool can't use ACC's own track limits check. The check only catches shortcuts, such as straight-lining a chicane. Running wide over the exit kerb isn't flagged, because it doesn't shorten the run. The first runs on a new pair of timing lines have nothing to compare against, so they're always recorded. Once three runs have a measured distance, the tool applies the same check to the runs already in your history, including your PB, and removes the invalid runs. It does this after each run and when it starts.
+With an experimental track boundary file installed, ACC Repeat checks the four tyre contact positions against the mapped edges. It rejects a run if all four contact points stay more than 0.25 m outside for at least 0.12 s. The check starts fresh at the timing line regardless of the saved lap’s validity.
+
+This pilot uses geometric boundaries. ACC also applies track-specific rules, surface exceptions, and other invalidation conditions. For tracks without boundary data, the app records section times without a track-limits verdict.
 
 ### Remove a run
 
@@ -112,11 +114,11 @@ Run the following from the repository root in PowerShell. The build uses the 64-
 & '.\bin\ACC Repeat.exe'
 ```
 
-Run `.\Build.ps1 -Test` to build the app and run the xUnit tests in `tests/`, which cover save selection, wheel button decoding, section timing, cut detection, attempt history, the loop countdown, track maps, and menu layout without opening ACC. The tests need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0); the app itself doesn't. CI runs the same command on every push and pull request. Run `.\Build.ps1 -Console` to build the command-line version. It uses the same settings file and shortcuts. Type `help` in the console to see its commands.
+Run `.\Build.ps1 -Test` to build the app and run the xUnit tests in `tests/`, which cover save selection, wheel button decoding, section timing, tyre-based track limits, attempt history, the loop countdown, track maps, and menu layout without opening ACC. The tests need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0); the app itself doesn't. CI runs the same command on every push and pull request. Run `.\Build.ps1 -Console` to build the command-line version. It uses the same settings file and shortcuts. Type `help` in the console to see its commands.
 
 ## How it works
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for how the tool reads ACC's shared memory, recognizes menus at different resolutions, times sections and spots cut runs, and for the tradeoffs and limitations behind those choices.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the tool reads ACC's shared memory, recognizes menus at different resolutions, times sections and checks experimental track limits, and for the tradeoffs and limitations behind those choices.
 
 ## Compatibility
 

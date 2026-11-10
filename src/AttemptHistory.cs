@@ -14,57 +14,16 @@ internal static partial class RepeatCorner
         public double Path;
     }
 
-    // ACC marks every lap invalid as soon as a save loads, so its lap-validity flag can't
-    // separate clean runs from cut ones. A run that is clearly shorter than the usual line
-    // through the section is treated as a cut instead.
-    private const double CutMinimumMetres = 4, CutFraction = 0.01;
+    // The last run rejected by the experimental wheel check, until another is recorded.
+    private static Section invalidSection;
+    private static Attempt invalidRun;
 
-    // The most recent run that was discarded as a cut, until a run is recorded.
-    private static Section cutSection;
-    private static Attempt cutRun;
-    private static double cutShortBy;
-
-    private static void ReportCut(Section section, Attempt attempt, double shortBy)
+    private static void ReportInvalid(Section section, Attempt attempt, BoundaryTrace boundary)
     {
-        cutSection = section;
-        cutRun = attempt;
-        cutShortBy = shortBy;
-        ReportStatus(string.Format("Invalid run: {0:0.00} s, but {1:0} m shorter than your usual line. " +
-            "Looks like a cut.", attempt.Seconds, shortBy));
-    }
-
-    internal static double? CutMetres(Section section, Attempt attempt)
-    {
-        var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
-        if (paths.Length == 0 || attempt.Path <= 0) return null;
-        double usual = paths[paths.Length / 2];
-        double shorter = usual - attempt.Path;
-        return shorter > Math.Max(CutMinimumMetres, usual * CutFraction) ? shorter : (double?)null;
-    }
-
-    // The first runs on new markers have nothing to compare against, so a cut can be
-    // recorded, even as the personal best. Once three runs have a measured distance, the
-    // same check is applied to every recorded run and the cuts are dropped.
-    internal static int PruneCuts(Section section)
-    {
-        var paths = section.RecentAttempts.Select(run => run.Path).Where(path => path > 0).OrderBy(path => path).ToArray();
-        if (paths.Length < 3) return 0;
-        double usual = paths[paths.Length / 2];
-        Func<Attempt, bool> isCut = run => run.Path > 0 && usual - run.Path > Math.Max(CutMinimumMetres, usual * CutFraction);
-        var cuts = section.RecentAttempts.Where(isCut).ToList();
-        bool bestIsCut = section.BestAttempt != null && isCut(section.BestAttempt);
-        int removed = cuts.Count + (bestIsCut && !cuts.Any(run => SameRun(run, section.BestAttempt)) ? 1 : 0);
-        section.RecentAttempts.RemoveAll(run => cuts.Contains(run));
-        if (bestIsCut) section.BestAttempt = QuickestRecent(section);
-        return removed;
-    }
-
-    private static void PruneAllCuts()
-    {
-        int removed = store.Settings.Sections.Sum(section => PruneCuts(section));
-        if (removed == 0) return;
-        store.Save();
-        ReportStatus(string.Format("Removed {0} earlier run{1} that look like cuts.", removed, removed == 1 ? "" : "s"));
+        invalidSection = section;
+        invalidRun = attempt;
+        ReportStatus(string.Format("{0} wheel check: invalid {1:0.000} s. All tyres outside, nearest {2:0.00} m at X={3:0.0}, Z={4:0.0}.",
+            section.Track, attempt.Seconds, boundary.CutMetres, boundary.CutX, boundary.CutZ));
     }
 
     private static bool SameRun(Attempt left, Attempt right)
@@ -166,20 +125,14 @@ internal static partial class RepeatCorner
 
     private static void ReportAttempt(Section section, Attempt attempt)
     {
-        cutSection = null;
-        cutRun = null;
+        invalidSection = null;
+        invalidRun = null;
         double? delta = RecordAttempt(section, attempt);
         string comparison = delta.HasValue ? string.Format(" | {0:+0.00;-0.00;0.00} s vs previous best", delta.Value) : "";
         bool newBest = !delta.HasValue || delta.Value < 0;
         Console.WriteLine("{0}: {1}{2}{3}", section.Checkpoint ?? section.Track,
             DescribeAttempt(attempt), comparison, newBest ? " | New best" : "");
-        int pruned = PruneCuts(section);
         string note = string.Format("Run recorded: {0:0.00} s.", attempt.Seconds);
-        if (pruned != 0)
-        {
-            note += string.Format(" Removed {0} earlier run{1} that look like cuts.", pruned, pruned == 1 ? "" : "s");
-            Console.WriteLine(note);
-        }
         if (desktopSession != null) desktopSession.Note(note);
 
         try { store.Save(); }

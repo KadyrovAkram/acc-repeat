@@ -70,7 +70,6 @@ internal static partial class RepeatCorner
             {
                 store.Load();
                 LoadTrackMaps();
-                PruneAllCuts();
                 if (desktop == null)
                 {
                     Console.Title = "ACC Repeat";

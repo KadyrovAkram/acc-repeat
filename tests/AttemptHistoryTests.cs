@@ -4,81 +4,23 @@ using static RepeatCorner;
 
 namespace ACCRepeat.Tests
 {
-    public class CutDetectionTests
-    {
-        private readonly Section section = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
-
-        public CutDetectionTests()
-        {
-            foreach (double path in new[] { 812.0, 809.0, 814.0 })
-                section.RecentAttempts.Add(new Attempt { Seconds = 29, Path = path });
-            section.RecentAttempts.Add(new Attempt { Seconds = 29 });
-        }
-
-        [Fact]
-        public void NothingIsACutWithoutEarlierRuns()
-        {
-            var empty = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
-            Assert.Null(CutMetres(empty, new Attempt { Seconds = 28, Path = 700 }));
-        }
-
-        [Fact]
-        public void SlightlyTighterLineIsNotACut()
-        {
-            Assert.Null(CutMetres(section, new Attempt { Seconds = 28.9, Path = 806 }));
-        }
-
-        [Fact]
-        public void RunningWideIsNotACut()
-        {
-            Assert.Null(CutMetres(section, new Attempt { Seconds = 28.5, Path = 830 }));
-        }
-
-        [Fact]
-        public void ChicaneCutIsDetectedWithTheMetresSaved()
-        {
-            var cut = CutMetres(section, new Attempt { Seconds = 27.4, Path = 790 });
-            Assert.True(cut.HasValue);
-            Assert.Equal(22, cut.Value, 6);
-        }
-
-        [Fact]
-        public void RunWithoutMeasuredDistanceIsNotACut()
-        {
-            Assert.Null(CutMetres(section, new Attempt { Seconds = 27.4 }));
-        }
-    }
-
     public class RunRemovalTests
     {
         private readonly Section section = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
 
         public RunRemovalTests()
         {
-            // Two cuts recorded first, while there was nothing to compare against.
             foreach (var run in new[]
             {
                 new Attempt { Seconds = 28.9, Path = 811 }, new Attempt { Seconds = 28.7, Path = 812 },
-                new Attempt { Seconds = 29.1, Path = 810 }, new Attempt { Seconds = 27.4, Path = 789 },
-                new Attempt { Seconds = 27.6, Path = 791 }
+                new Attempt { Seconds = 29.1, Path = 810 }
             })
                 RecordAttempt(section, run);
         }
 
         [Fact]
-        public void EarlierCutsArePrunedOnceTheUsualLineIsKnown()
-        {
-            Assert.Equal(27.4, section.BestAttempt.Seconds);
-            Assert.Equal(2, PruneCuts(section));
-            Assert.Equal(3, section.RecentAttempts.Count);
-            Assert.Equal(28.7, section.BestAttempt.Seconds);
-            Assert.Equal(0, PruneCuts(section));
-        }
-
-        [Fact]
         public void RemovingThePersonalBestPromotesTheNextQuickestRun()
         {
-            PruneCuts(section);
             // A best restored from the settings file is a separate object with the same values.
             section.BestAttempt = Json.Deserialize<Attempt>(Json.Serialize(section.BestAttempt));
 
@@ -90,7 +32,6 @@ namespace ACCRepeat.Tests
         [Fact]
         public void RemovingASlowerRunKeepsThePersonalBest()
         {
-            PruneCuts(section);
             Assert.False(DropAttempt(section, section.RecentAttempts.Find(run => run.Seconds == 29.1)));
             Assert.Equal(28.7, section.BestAttempt.Seconds);
         }
@@ -101,14 +42,6 @@ namespace ACCRepeat.Tests
             Assert.Throws<InvalidOperationException>(() => DropAttempt(section, new Attempt { Seconds = 30 }));
         }
 
-        [Fact]
-        public void RunsWithoutMeasuredDistanceAreNeverPruned()
-        {
-            var legacy = new Section { Track = "monza", Start = 0.04, Finish = 0.18 };
-            foreach (double seconds in new[] { 29.0, 27.0, 28.0, 28.5 }) RecordAttempt(legacy, new Attempt { Seconds = seconds });
-            Assert.Equal(0, PruneCuts(legacy));
-            Assert.Equal(4, legacy.RecentAttempts.Count);
-        }
     }
 
     public class AttemptHistoryTests

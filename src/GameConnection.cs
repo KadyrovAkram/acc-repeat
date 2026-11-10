@@ -109,13 +109,13 @@ internal static partial class RepeatCorner
                 return map.CreateViewAccessor(0, size, MemoryMappedFileAccess.Read);
         }
 
-        public TelemetryFrame ReadTelemetry(bool allowPaused)
+        public TelemetryFrame ReadTelemetry(bool allowPaused, bool readTyres = false)
         {
             try
             {
                 // Field offsets are from Kunos's ACC Shared Memory v1.8.12 layout (4-byte packing).
                 using (var graphics = OpenPage("graphics", 1240))
-                using (var physics = OpenPage("physics", 32))
+                using (var physics = OpenPage("physics", readTyres ? 468 : 32))
                 using (var session = OpenPage("static", 688))
                 {
                     int status = graphics.ReadInt32(4);
@@ -137,7 +137,7 @@ internal static partial class RepeatCorner
                     int player = graphics.ReadInt32(1216), slot = -1;
                     for (int car = 0; car < active && slot < 0; car++)
                         if (graphics.ReadInt32(976 + car * 4) == player) slot = car;
-                    return new TelemetryFrame
+                    var frame = new TelemetryFrame
                     {
                         HasCoordinates = slot >= 0,
                         X = slot >= 0 ? graphics.ReadSingle(256 + slot * 12) : 0,
@@ -145,11 +145,29 @@ internal static partial class RepeatCorner
                         Track = trackName, Position = position, Distance = distance, Speed = speed,
                         Packet = graphics.ReadInt32(0), Time = clock.Now, Paused = status == 3
                     };
+                    if (readTyres && frame.HasCoordinates && FindTrackLimits(trackName) != null)
+                        frame.Tyres = ReadTyreContacts(physics, frame.X, frame.Z);
+                    return frame;
                 }
             }
             catch (IOException) { return null; }
             catch (UnauthorizedAccessException) { return null; }
             catch (ArgumentException) { return null; }
+        }
+
+        private static PointF[] ReadTyreContacts(MemoryMappedViewAccessor physics, double carX, double carZ)
+        {
+            // tyreContactPoint[4][3] in ACC world coordinates, FL, FR, RL, RR.
+            var tyres = new PointF[4];
+            for (int wheel = 0; wheel < tyres.Length; wheel++)
+            {
+                int offset = 420 + wheel * 12;
+                float x = physics.ReadSingle(offset), z = physics.ReadSingle(offset + 8);
+                double dx = x - carX, dz = z - carZ;
+                if (!(dx * dx + dz * dz < 25) || (x == 0 && z == 0)) return null;
+                tyres[wheel] = new PointF(x, z);
+            }
+            return tyres;
         }
     }
 }
