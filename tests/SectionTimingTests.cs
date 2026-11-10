@@ -1,3 +1,4 @@
+using System.Drawing;
 using Xunit;
 using static ACCRepeat.Tests.Telemetry;
 using static RepeatCorner;
@@ -70,6 +71,50 @@ namespace ACCRepeat.Tests
 
             Assert.NotNull(result);
             Assert.Equal(result.Seconds * 20, result.Path, Precision);
+        }
+
+        [Theory]
+        [InlineData(8, 8, false)]
+        [InlineData(0, 8, false)]
+        [InlineData(0, 0, true)]
+        public void WheelCheckRequiresAllFourTyresOutside(double threeTyres, double fourthTyre, bool expectedInvalid)
+        {
+            var limits = new TrackLimits(Square(12), Square(5));
+            var section = new Section { Track = "brands_hatch", Start = 0.1, Finish = 0.105 };
+            Attempt result = null;
+            for (int index = 0; index < 8; index++)
+            {
+                var frame = Frame(index, 0.099 + index * 0.001, index * 0.05, index, 72);
+                frame.Tyres = index >= 2 && index <= 5 ? Tyres(threeTyres, fourthTyre) : Tyres(8, 8);
+                result = timer.Observe(section, frame, limits) ?? result;
+            }
+
+            Assert.NotNull(result);
+            Assert.Equal(expectedInvalid, timer.Boundary.CutMetres > 0);
+
+            timer.Reset();
+            for (int index = 0; index < 8; index++)
+            {
+                var frame = Frame(index, 0.099 + index * 0.001, index * 0.05, index, 72);
+                frame.Tyres = Tyres(8, 8);
+                timer.Observe(section, frame, limits);
+            }
+            Assert.Equal(0, timer.Boundary.CutMetres);
+        }
+
+        private static PointF[] Tyres(double threeTyres, double fourthTyre)
+        {
+            var outside = new PointF((float)threeTyres, 0);
+            return new[] { outside, outside, outside, new PointF((float)fourthTyre, 0) };
+        }
+
+        private static PointF[] Square(float halfWidth)
+        {
+            return new[]
+            {
+                new PointF(-halfWidth, -halfWidth), new PointF(halfWidth, -halfWidth),
+                new PointF(halfWidth, halfWidth), new PointF(-halfWidth, halfWidth)
+            };
         }
     }
 }

@@ -185,9 +185,9 @@ internal static partial class RepeatCorner
                 double elapsed = Math.Max(0, sectionClock.Elapsed.TotalSeconds - view.LiveStart.Value);
                 return new[] { "LIVE", elapsed.ToString("0.0"), "", footer, "red", "time", "" };
             }
-            if (view.LastCut != null)
-                return new[] { "INVALID · CUT", view.LastCut.Seconds.ToString("0.000"),
-                    "−" + view.LastCutShortBy.ToString("0") + " m", footer, "amber", "time", "amber" };
+            if (view.LastInvalid != null)
+                return new[] { "INVALID · TRACK LIMITS", view.LastInvalid.Seconds.ToString("0.000"),
+                    "Tyres outside", footer, "amber", "time", "amber" };
 
             var last = view.Recent.FirstOrDefault();
             if (last == null)

@@ -124,8 +124,7 @@ internal static partial class RepeatCorner
                 Reloading = resets.InProgress,
                 OverlayPosition = OverlayPositions.Contains(store.Settings.Overlay) ? store.Settings.Overlay : DefaultOverlayPosition,
                 LiveStart = timer.StartedAt,
-                LastCut = section != null && section == cutSection ? cutRun : null,
-                LastCutShortBy = cutShortBy,
+                LastInvalid = section != null && section == invalidSection ? invalidRun : null,
                 Countdown = countdown == null || countdown.IsSuspended || countdown.RemainingSeconds < 0 ?
                     (int?)null : countdown.RemainingSeconds,
                 Status = DescribeStatus(connected, selected),
@@ -173,8 +172,7 @@ internal static partial class RepeatCorner
         public TrackMapView Map;
         public double? LiveStart;
         public int? Countdown;
-        public Attempt LastCut;
-        public double LastCutShortBy;
+        public Attempt LastInvalid;
         public string[] PinNames;
         public Save[] AvailableSaves;
         public Attempt[] Recent;

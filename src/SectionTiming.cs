@@ -126,17 +126,21 @@ internal static partial class RepeatCorner
             timer.Reset();
             return;
         }
-        var frame = game.ReadTelemetry(false);
+        var frame = game.ReadTelemetry(false, readTyres: true);
         var sectionOnTrack = frame == null ? null : store.CurrentSection(frame.Track);
-        var result = timer.Observe(sectionOnTrack, frame);
+        var limits = sectionOnTrack == null ? null : FindTrackLimits(sectionOnTrack.Track);
+        var result = timer.Observe(sectionOnTrack, frame, limits);
         if (result == null) return;
-        double? cut = CutMetres(sectionOnTrack, result);
-        if (cut.HasValue)
+        var boundary = timer.Boundary;
+        if (boundary != null && boundary.CutMetres > 0)
         {
-            ReportCut(sectionOnTrack, result, cut.Value);
-            StartLoopCountdown(sectionOnTrack, "Invalid. Cut.");
+            ReportInvalid(sectionOnTrack, result, boundary);
+            StartLoopCountdown(sectionOnTrack, "Invalid. Track limits.");
             return;
         }
+        if (boundary != null)
+            DiagnosticLog.Info(string.Format("{0} wheel check: {1:0.000} s, {2} tyre samples, max nearest tyre {3:0.00} m outside.",
+                sectionOnTrack.Track, result.Seconds, boundary.Samples, boundary.MaxOutsideMetres));
         ReportAttempt(sectionOnTrack, result);
         StartLoopCountdown(sectionOnTrack, string.Format("{0:0.00} seconds.", result.Seconds));
     }
@@ -159,6 +163,7 @@ internal static partial class RepeatCorner
         private double? startTime;
         private double entrySpeed;
         private double path;
+        internal BoundaryTrace Boundary { get; private set; }
 
         // When the car crossed the start of the attempt in progress, in sectionClock seconds.
         public double? StartedAt { get { return startTime; } }
@@ -168,6 +173,7 @@ internal static partial class RepeatCorner
             previous = null;
             startTime = null;
             path = 0;
+            Boundary = null;
         }
 
         public static double ForwardDistance(double from, double to)
@@ -176,7 +182,7 @@ internal static partial class RepeatCorner
             return delta < 0 ? delta + 1 : delta;
         }
 
-        public Attempt Observe(Section active, TelemetryFrame current)
+        public Attempt Observe(Section active, TelemetryFrame current, TrackLimits limits = null)
         {
             if (active != section || active == null || !active.Finish.HasValue || current == null)
                 Reset();
@@ -207,13 +213,17 @@ internal static partial class RepeatCorner
                 // A repeated or slightly regressed lap position can't cross a timing line,
                 // but the car can still be moving between these samples.
                 if (startTime.HasValue)
+                {
                     path += driven;
+                    ObserveBoundary(limits, before, current, 1);
+                }
                 return null;
             }
 
             double toStart = ForwardDistance(before.Position, active.Start);
             double toFinish = ForwardDistance(before.Position, active.Finish.Value);
             bool startCrossed = toStart > 0 && toStart <= progress;
+            bool finishCrossed = toFinish > 0 && toFinish <= progress;
             double drivenFrom = 0;
             if (startCrossed && (!startTime.HasValue || toStart <= toFinish))
             {
@@ -222,15 +232,19 @@ internal static partial class RepeatCorner
                 entrySpeed = before.Speed + (current.Speed - before.Speed) * fraction;
                 path = 0;
                 drivenFrom = fraction;
+                Boundary = limits == null ? null : new BoundaryTrace();
+                ObserveBoundary(limits, before, current, fraction);
             }
             if (!startTime.HasValue) return null;
-            if (toFinish <= 0 || toFinish > progress)
+            if (!finishCrossed)
             {
                 path += driven * (1 - drivenFrom);
+                ObserveBoundary(limits, before, current, 1);
                 return null;
             }
 
             double exitFraction = toFinish / progress;
+            ObserveBoundary(limits, before, current, exitFraction);
             double duration = before.Time + seconds * exitFraction - startTime.Value;
             startTime = null;
             if (duration <= 0) return null;
@@ -240,6 +254,13 @@ internal static partial class RepeatCorner
                 ExitSpeed = before.Speed + (current.Speed - before.Speed) * exitFraction,
                 Path = path + driven * (exitFraction - drivenFrom)
             };
+        }
+
+        private void ObserveBoundary(TrackLimits limits, TelemetryFrame before, TelemetryFrame current, double fraction)
+        {
+            if (Boundary == null || limits == null) return;
+            Boundary.Observe(limits, before.Time + (current.Time - before.Time) * fraction,
+                before.Tyres, current.Tyres, fraction);
         }
     }
 }
