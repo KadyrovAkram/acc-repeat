@@ -12,7 +12,7 @@ flowchart LR
 
     subgraph Engine["Engine thread (15 ms loop)"]
         POLL["PollSection<br/>SectionTimer"]
-        CUT["Cut check<br/>CutMetres / PruneCuts"]
+        VALIDITY["Experimental track limits<br/>tyreContactPoint"]
         LOOP["PollLoop<br/>LoopCountdown"]
         RESET["Retry<br/>reset steps"]
         INPUT["Hotkeys and wheel<br/>RegisterHotKey / joyGetPosEx"]
@@ -27,7 +27,7 @@ flowchart LR
     LOG[("ACCRepeat.log")]
 
     SHM -->|"lap position, speed, coordinates"| POLL
-    POLL --> CUT --> LOOP
+    POLL --> VALIDITY --> LOOP
     LOOP -->|"countdown hits 0"| RESET
     INPUT --> RESET
     SAVES -->|"pick the pinned save"| RESET
@@ -65,11 +65,11 @@ A section is two lap positions, `Start` and `Finish`. Telemetry arrives at 40 Hz
 
 The timer is defensive about discontinuities. A frame is rejected and the run abandoned if time goes backwards, the gap is over 350 ms, or the car moved further than its speed allows (a teleport after loading a save). A section crossed in one jump therefore never counts as a run.
 
-## Spotting shortcut runs
+## Experimental track limits
 
-ACC marks every lap invalid as soon as a save loads, so its own track-limits verdict is useless here. Instead, the timer also integrates the **distance actually driven** from speed and time (`(v1 + v2) / 2 × dt`). ACC's own distance and lap position follow the track's centre line, so they don't shrink when you cut a chicane, but distance from speed does.
+An optional `TrackLimits/<track>.csv` beside the executable supplies two closed boundary rings in ACC world metres. Each row is an X,Z point and a blank line separates the rings. ACC Repeat reads the four `tyreContactPoint` coordinates, checks the nearest tyre against the mapped edges, and starts a new check at each timed start. If the nearest tyre is over 0.25 m outside continuously for 0.12 s, the attempt is rejected. Missing contact data interrupts the excursion check.
 
-`CutMetres` compares a run's driven distance with the **median** of recent runs. If it's shorter by more than 1 % or 4 m, whichever is larger, the run is a cut. The median keeps one odd run from moving the baseline. Running wide makes a run *longer*, so it's deliberately not flagged. Because the first runs on new lines have nothing to compare against, `PruneCuts` re-checks the stored history once three measured runs exist and removes cuts that slipped in, including a cut personal best.
+The boundary map and the two thresholds are an approximation. The game’s legal surface definitions and other invalidation conditions are outside the scope of this pilot.
 
 ## Resetting by driving the menus
 
@@ -100,13 +100,12 @@ Each reset step, the ACC window size, every menu recognized (with how long it to
 
 ## Testing
 
-The xUnit project in `tests/` compiles the app's sources directly and covers the logic that doesn't need ACC running: save selection and pin renames, crossing interpolation and lap wrap, teleport and interruption handling, driven distance, cut detection and pruning, run history and PB promotion, the loop countdown, track map picking and `.bin` import, all bundled maps, menu layout geometry and signature matching, loading and saving settings, and the reset itself. The reset tests run `RetryController` against `SimulatedAcc`, a fake that shows one menu at a time, reacts to clicks on the menu buttons and keeps time on a clock that only moves when the reset sleeps. They check the order of clicks, that Saved Games is clicked at most three times, that a menu that never appears stops the reset and names the step, and that F9, a covered Play button, a changed save and time spent away from ACC are handled. CI runs the build and the tests on `windows-latest` for every push and pull request.
+The xUnit project in `tests/` compiles the app's sources directly and covers the logic that doesn't need ACC running: save selection and pin renames, crossing interpolation and lap wrap, teleport and interruption handling, driven distance, tyre-based track limits, run history and PB promotion, the loop countdown, track map picking and `.bin` import, all bundled maps, menu layout geometry and signature matching, loading and saving settings, and the reset itself. The reset tests run `RetryController` against `SimulatedAcc`, a fake that shows one menu at a time, reacts to clicks on the menu buttons and keeps time on a clock that only moves when the reset sleeps. They check the order of clicks, that Saved Games is clicked at most three times, that a menu that never appears stops the reset and names the step, and that F9, a covered Play button, a changed save and time spent away from ACC are handled. CI runs the build and the tests on `windows-latest` for every push and pull request.
 
 What the tests can't cover is the conversation with the real game: the real screen capture, synthetic input and live shared memory behind those interfaces. Those are checked by hand in ACC.
 
 ## Tradeoffs and limitations
 
-- **Driven distance instead of ACC's track limits.** ACC invalidates every lap after a save loads, so there is no usable track-limits signal. The distance-based check only catches shortcuts that shorten the run, such as straight-lining a chicane. Running wide over a kerb isn't flagged, and the first runs on new lines can't be judged until there are runs to compare against.
 - **Pixel signatures instead of OCR or an API.** ACC has no automation API, and OCR would add a large dependency and still need per-layout tuning. Signatures are small and fast, but they're tied to the **English menus of ACC 1.10.4** and to the four client sizes that have reference layouts (1920 × 1080, 2560 × 1440, 1440 × 900, 2880 × 1800). Each new layout means capturing new signatures by hand.
 - **Windowed or borderless only for the overlay.** The overlay is a layered, click-through window above ACC. Exclusive fullscreen doesn't allow other windows on top, so the overlay can't appear there.
 - **Synthetic input needs a clear view.** Clicks go to screen coordinates, so another window covering ACC's **Play** button would receive the click. The tool checks which window is under the button before clicking and stops instead of clicking the wrong thing.
