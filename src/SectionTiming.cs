@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 
@@ -148,6 +149,7 @@ internal static partial class RepeatCorner
         public double Position, Distance, Speed, Time;
         public bool HasCoordinates;
         public double X, Z;
+        public PointF[] Tyres;
     }
 
     internal sealed class SectionTimer
