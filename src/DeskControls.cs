@@ -1,32 +1,96 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 // Dark controls for the Practice desk. Stock WinForms controls draw light chrome
 // (dropdown arrows, spinners, disabled buttons) that cannot be themed.
+// The look follows ACC's own screens and timing displays: flat black panels, square
+// corners, condensed capitals for labels, and colour only where it means something.
 internal static partial class RepeatCorner
 {
     private static class Theme
     {
-        public static readonly Color Background = Color.FromArgb(24, 25, 29);
-        public static readonly Color Surface = Color.FromArgb(33, 35, 40);
-        public static readonly Color Inset = Color.FromArgb(45, 47, 55);
-        public static readonly Color Hover = Color.FromArgb(57, 60, 69);
-        public static readonly Color RowHover = Color.FromArgb(38, 40, 46);
-        public static readonly Color Line = Color.FromArgb(52, 54, 62);
-        public static readonly Color Text = Color.FromArgb(244, 244, 248);
-        public static readonly Color Muted = Color.FromArgb(163, 166, 178);
-        public static readonly Color Faint = Color.FromArgb(108, 111, 123);
-        public static readonly Color Red = Color.FromArgb(196, 38, 61);
-        public static readonly Color RedHover = Color.FromArgb(218, 54, 78);
-        public static readonly Color RedPressed = Color.FromArgb(160, 30, 50);
-        public static readonly Color Green = Color.FromArgb(125, 225, 174);
-        public static readonly Color Amber = Color.FromArgb(242, 178, 92);
+        public static readonly Color Background = Color.FromArgb(14, 14, 14);
+        public static readonly Color Surface = Color.FromArgb(24, 24, 24);
+        public static readonly Color Inset = Color.FromArgb(40, 40, 40);
+        public static readonly Color Hover = Color.FromArgb(56, 56, 56);
+        public static readonly Color RowHover = Color.FromArgb(30, 30, 30);
+        public static readonly Color Line = Color.FromArgb(44, 44, 44);
+        public static readonly Color Text = Color.FromArgb(242, 242, 242);
+        public static readonly Color Muted = Color.FromArgb(150, 150, 150);
+        public static readonly Color Faint = Color.FromArgb(96, 96, 96);
+        // ACC's menu highlight red: primary actions and the timed section on the map.
+        public static readonly Color Red = Color.FromArgb(214, 0, 0);
+        public static readonly Color RedHover = Color.FromArgb(236, 26, 26);
+        public static readonly Color RedPressed = Color.FromArgb(166, 0, 0);
+        // Timing colours: green is a personal best, yellow is slower or needs attention.
+        public static readonly Color Green = Color.FromArgb(40, 204, 92);
+        public static readonly Color Yellow = Color.FromArgb(245, 196, 0);
+
+        // Bahnschrift (DIN-style, ships with Windows 10 1709+) has the condensed widths and
+        // tabular figures a timing display wants; older Windows falls back to Segoe UI.
+        private static readonly bool hasBahnschrift =
+            new InstalledFontCollection().Families.Any(family => family.Name == "Bahnschrift");
+
+        public static Font Type(float size, FontStyle style = FontStyle.Regular, GraphicsUnit unit = GraphicsUnit.Point)
+        {
+            return new Font(hasBahnschrift ? "Bahnschrift" : "Segoe UI", size, style, unit);
+        }
+
+        public static Font Strong(float size, GraphicsUnit unit = GraphicsUnit.Point)
+        {
+            return new Font(hasBahnschrift ? "Bahnschrift SemiBold" : "Segoe UI Semibold", size, FontStyle.Regular, unit);
+        }
+
+        // Condensed capitals for labels and buttons, as in ACC's menus.
+        public static Font Label(float size, GraphicsUnit unit = GraphicsUnit.Point)
+        {
+            return new Font(hasBahnschrift ? "Bahnschrift SemiBold Condensed" : "Segoe UI Semibold", size, FontStyle.Regular, unit);
+        }
 
         public static float Scale(Graphics graphics) { return graphics.DpiX / 96f; }
+
+        // Draws text as outlines so its ink, not its text box, starts (or ends) exactly at x and
+        // sits on the given baseline. Large type otherwise drifts inward by its side bearing.
+        public static void DrawInk(Graphics graphics, string text, Font font, Color color, float x, float baseline, bool alignRight)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            var family = font.FontFamily;
+            float size = font.Unit == GraphicsUnit.Pixel ? font.Size : font.SizeInPoints * graphics.DpiY / 72f;
+            // Winding fill: Bahnschrift is a variable font whose outlines overlap, and the default
+            // alternate fill would punch holes where they cross.
+            using (var path = new GraphicsPath(FillMode.Winding))
+            using (var brush = new SolidBrush(color))
+            {
+                path.AddString(text, family, (int)font.Style, size, PointF.Empty, StringFormat.GenericTypographic);
+                var ink = path.GetBounds();
+                float ascent = size * family.GetCellAscent(font.Style) / family.GetEmHeight(font.Style);
+                using (var move = new Matrix())
+                {
+                    move.Translate(alignRight ? x - ink.Right : x - ink.Left, baseline - ascent);
+                    path.Transform(move);
+                }
+                var smoothing = graphics.SmoothingMode;
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.FillPath(brush, path);
+                graphics.SmoothingMode = smoothing;
+            }
+        }
+
+        // Height of capital letters above the baseline, for centring a line of type by its caps.
+        public static float CapHeight(Font font, Graphics graphics)
+        {
+            float size = font.Unit == GraphicsUnit.Pixel ? font.Size : font.SizeInPoints * graphics.DpiY / 72f;
+            using (var path = new GraphicsPath())
+            {
+                path.AddString("H", font.FontFamily, (int)font.Style, size, PointF.Empty, StringFormat.GenericTypographic);
+                return path.GetBounds().Height;
+            }
+        }
 
         public static Color Blend(Color first, Color second, float amount)
         {
@@ -36,35 +100,15 @@ internal static partial class RepeatCorner
                 (int)(first.B + (second.B - first.B) * amount));
         }
 
-        public static GraphicsPath Rounded(RectangleF bounds, float radius)
+        public static void Fill(Graphics graphics, Color color, RectangleF bounds)
         {
-            var path = new GraphicsPath();
-            float diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
-            if (diameter <= 0)
-            {
-                path.AddRectangle(bounds);
-                return path;
-            }
-            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
+            using (var brush = new SolidBrush(color)) graphics.FillRectangle(brush, bounds);
         }
 
-        public static void FillRounded(Graphics graphics, Color color, RectangleF bounds, float radius)
+        public static void Outline(Graphics graphics, Color color, Rectangle bounds, float width)
         {
-            using (var path = Rounded(bounds, radius))
-            using (var brush = new SolidBrush(color))
-                graphics.FillPath(brush, path);
-        }
-
-        public static void OutlineRounded(Graphics graphics, Color color, RectangleF bounds, float radius, float width)
-        {
-            using (var path = Rounded(bounds, radius))
-            using (var pen = new Pen(color, width))
-                graphics.DrawPath(pen, path);
+            using (var pen = new Pen(color, width) { Alignment = PenAlignment.Inset })
+                graphics.DrawRectangle(pen, bounds);
         }
 
         public static Color ParentColor(Control control)
@@ -82,7 +126,7 @@ internal static partial class RepeatCorner
                     int enabled = 1;
                     if (DwmSetWindowAttribute(form.Handle, 20, ref enabled, 4) != 0)
                         DwmSetWindowAttribute(form.Handle, 19, ref enabled, 4);
-                    int caption = Surface.R | (Surface.G << 8) | (Surface.B << 16);
+                    int caption = Background.R | (Background.G << 8) | (Background.B << 16);
                     DwmSetWindowAttribute(form.Handle, 35, ref caption, 4);
                 }
                 catch (DllNotFoundException) { }
@@ -94,6 +138,90 @@ internal static partial class RepeatCorner
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     }
 
+    // A single line of text with no side padding, so it lines up with other text and controls.
+    // Large type is drawn by its ink and sits on a baseline near the bottom edge.
+    private sealed class FlushLabel : Control
+    {
+        public FlushLabel(float size, bool strong)
+        {
+            Dock = DockStyle.Fill;
+            Margin = Padding.Empty;
+            Font = strong ? Theme.Strong(size) : Theme.Type(size);
+            ForeColor = Theme.Text;
+            AccessibleRole = AccessibleRole.StaticText;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+
+        // For large type: the gap between the baseline and the bottom edge, in 96 dpi pixels.
+        public int BaselineInset { get; set; }
+
+        protected override void OnTextChanged(EventArgs e) { AccessibleName = Text; Invalidate(); base.OnTextChanged(e); }
+        protected override void OnForeColorChanged(EventArgs e) { Invalidate(); base.OnForeColorChanged(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var graphics = e.Graphics;
+            var back = Theme.ParentColor(this);
+            graphics.Clear(back);
+            if (BaselineInset > 0)
+                Theme.DrawInk(graphics, Text, Font, ForeColor, 0, Height - BaselineInset * Theme.Scale(graphics), false);
+            else
+                TextRenderer.DrawText(graphics, Text, Font, ClientRectangle, ForeColor, back,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+                    TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+    }
+
+    // "● Connected to ACC", right-aligned: a green dot when connected, a hollow ring while waiting.
+    private sealed class ConnectionBadge : Control
+    {
+        private bool connected;
+
+        public ConnectionBadge()
+        {
+            Dock = DockStyle.Fill;
+            Margin = Padding.Empty;
+            Font = Theme.Type(10.5f);
+            AccessibleRole = AccessibleRole.StaticText;
+            Connected = false;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+
+        public bool Connected
+        {
+            get { return connected; }
+            set
+            {
+                connected = value;
+                Text = AccessibleName = value ? "Connected to ACC" : "Waiting for ACC";
+                Invalidate();
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var graphics = e.Graphics;
+            float scale = Theme.Scale(graphics);
+            var back = Theme.ParentColor(this);
+            graphics.Clear(back);
+            var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter;
+            var size = TextRenderer.MeasureText(graphics, Text, Font, Size.Empty, flags);
+            int textLeft = Width - size.Width;
+            TextRenderer.DrawText(graphics, Text, Font, new Rectangle(textLeft, 0, size.Width, Height),
+                connected ? Theme.Text : Theme.Muted, back, flags);
+            float diameter = 8 * scale;
+            var dot = new RectangleF(textLeft - diameter - 8 * scale, (Height - diameter) / 2f + 0.5f * scale, diameter, diameter);
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            if (connected)
+                using (var brush = new SolidBrush(Theme.Green)) graphics.FillEllipse(brush, dot);
+            else
+                using (var pen = new Pen(Theme.Muted, 1.4f * scale)) graphics.DrawEllipse(pen, dot);
+        }
+    }
+
+    // A flat, square button.
     private sealed class PillButton : Button
     {
         private bool hover, pressed;
@@ -108,6 +236,8 @@ internal static partial class RepeatCorner
             FlatAppearance.BorderSize = 0;
             UseVisualStyleBackColor = false;
             ForeColor = Theme.Text;
+            Font = Theme.Type(10.5f);
+            ForeColor = Color.FromArgb(232, 232, 232);
             Cursor = Cursors.Hand;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -130,25 +260,20 @@ internal static partial class RepeatCorner
             var graphics = e.Graphics;
             float scale = Theme.Scale(graphics);
             graphics.Clear(Theme.ParentColor(this));
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            var bounds = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-            float radius = 6 * scale;
 
-            Color fill, text = Theme.Text;
+            Color fill, text = ForeColor;
             if (!Enabled)
             {
-                fill = Theme.Blend(Theme.Inset, Theme.ParentColor(this), 0.5f);
+                fill = Theme.Blend(Theme.Inset, Theme.ParentColor(this), 0.55f);
                 text = Theme.Faint;
             }
             else if (primary)
                 fill = pressed ? Theme.RedPressed : hover ? Theme.RedHover : Theme.Red;
             else
                 fill = pressed ? Theme.Inset : hover ? Theme.Hover : Theme.Inset;
-            Theme.FillRounded(graphics, fill, bounds, radius);
-            if (!Enabled)
-                Theme.OutlineRounded(graphics, Theme.Line, bounds, radius, 1);
+            Theme.Fill(graphics, fill, ClientRectangle);
             if (Focused && ShowFocusCues)
-                Theme.OutlineRounded(graphics, Theme.Text, bounds, radius, 1.5f * scale);
+                Theme.Outline(graphics, Theme.Text, ClientRectangle, 1.5f * scale);
 
             TextRenderer.DrawText(graphics, Text, Font, ClientRectangle, text, fill,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
@@ -195,9 +320,8 @@ internal static partial class RepeatCorner
         {
             if (e.Index < 0) return;
             bool selected = (e.State & DrawItemState.Selected) != 0;
-            var fill = selected ? Theme.Hover : Theme.Inset;
-            using (var brush = new SolidBrush(fill))
-                e.Graphics.FillRectangle(brush, e.Bounds);
+            var fill = selected ? Theme.Red : Theme.Inset;
+            Theme.Fill(e.Graphics, fill, e.Bounds);
             var bounds = e.Bounds;
             bounds.X += Font.Height / 2;
             bounds.Width -= Font.Height / 2;
@@ -218,13 +342,10 @@ internal static partial class RepeatCorner
         {
             float scale = Theme.Scale(graphics);
             graphics.Clear(Theme.ParentColor(this));
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            var bounds = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-            float radius = 6 * scale;
-            var fill = !Enabled ? Theme.ParentColor(this) : hover || DroppedDown ? Theme.Hover : Theme.Inset;
-            Theme.FillRounded(graphics, fill, bounds, radius);
-            if (!Enabled) Theme.OutlineRounded(graphics, Theme.Line, bounds, radius, 1);
-            if (Focused) Theme.OutlineRounded(graphics, Theme.Muted, bounds, radius, 1.2f * scale);
+            var fill = !Enabled ? Theme.Blend(Theme.Inset, Theme.ParentColor(this), 0.55f) :
+                hover || DroppedDown ? Theme.Hover : Theme.Inset;
+            Theme.Fill(graphics, fill, ClientRectangle);
+            if (Focused) Theme.Outline(graphics, Theme.Muted, ClientRectangle, 1.2f * scale);
 
             int inset = (int)(10 * scale), arrow = (int)(28 * scale);
             var textBounds = new Rectangle(inset, 0, Math.Max(0, Width - inset - arrow), Height);
@@ -233,17 +354,15 @@ internal static partial class RepeatCorner
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
             float centerX = Width - 15 * scale, centerY = Height / 2f;
-            using (var pen = new Pen(Enabled ? Theme.Muted : Theme.Faint, 1.6f * scale))
-            {
-                pen.StartCap = pen.EndCap = LineCap.Round;
-                graphics.DrawLines(pen, new[]
+            using (var brush = new SolidBrush(Enabled ? Theme.Muted : Theme.Faint))
+                graphics.FillPolygon(brush, new[]
                 {
-                    new PointF(centerX - 4 * scale, centerY - 2 * scale),
-                    new PointF(centerX, centerY + 2 * scale),
-                    new PointF(centerX + 4 * scale, centerY - 2 * scale)
+                    new PointF(centerX - 4.5f * scale, centerY - 2.5f * scale),
+                    new PointF(centerX + 4.5f * scale, centerY - 2.5f * scale),
+                    new PointF(centerX, centerY + 3 * scale)
                 });
-            }
         }
     }
 
@@ -255,7 +374,7 @@ internal static partial class RepeatCorner
         private readonly Label value = new Label
         {
             Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty,
-            ForeColor = Theme.Text, UseMnemonic = false
+            ForeColor = Theme.Text, UseMnemonic = false, Font = Theme.Strong(10.5f)
         };
         private int current;
         public readonly int Minimum, Maximum;
@@ -274,6 +393,7 @@ internal static partial class RepeatCorner
             down.AccessibleName = "Decrease " + name.ToLowerInvariant();
             up.AccessibleName = "Increase " + name.ToLowerInvariant();
             down.Margin = up.Margin = new Padding(0, 2, 0, 2);
+            down.Font = up.Font = Theme.Strong(12);
             value.AccessibleName = name;
             Controls.Add(down, 0, 0);
             Controls.Add(value, 1, 0);
@@ -308,8 +428,68 @@ internal static partial class RepeatCorner
         }
     }
 
-    // Recent runs with a bar showing how far each run was from the personal best. Hovering a
-    // row shows a remove button; a best that dropped out of the recent list gets its own row.
+    // A quiet name followed by its value, e.g. "START 4.05%".
+    private sealed class Readout : Control
+    {
+        private readonly string name;
+        private string value = "—";
+        private Color valueColor = Theme.Text;
+
+        public Readout(string name)
+        {
+            this.name = name;
+            AccessibleName = name;
+            AccessibleRole = AccessibleRole.StaticText;
+            Dock = DockStyle.Fill;
+            Margin = Padding.Empty;
+            Font = Theme.Strong(11);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+
+        public string Value
+        {
+            get { return value; }
+            set { if (this.value != value) { this.value = value; AccessibleDescription = value; Invalidate(); } }
+        }
+
+        public Color ValueColor
+        {
+            get { return valueColor; }
+            set { if (valueColor != value) { valueColor = value; Invalidate(); } }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var graphics = e.Graphics;
+            float scale = Theme.Scale(graphics);
+            var back = Theme.ParentColor(this);
+            graphics.Clear(back);
+            var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+            using (var label = Theme.Label(9))
+            {
+                // The label and the larger value share a baseline, centred vertically.
+                float valueAscent = Ascent(Font, graphics), labelAscent = Ascent(label, graphics);
+                float baseline = (Height + valueAscent) / 2f - 1 * scale;
+                string caption = name.ToUpperInvariant();
+                var labelSize = TextRenderer.MeasureText(graphics, caption, label, Size.Empty, flags);
+                TextRenderer.DrawText(graphics, caption, label, new Point(0, (int)(baseline - labelAscent)), Theme.Muted, back, flags);
+                int x = labelSize.Width + (int)(7 * scale);
+                TextRenderer.DrawText(graphics, value, Font,
+                    new Rectangle(x, (int)(baseline - valueAscent), Math.Max(0, Width - x), Font.Height),
+                    Enabled ? valueColor : Theme.Faint, back, flags | TextFormatFlags.EndEllipsis);
+            }
+        }
+
+        private static float Ascent(Font font, Graphics graphics)
+        {
+            var family = font.FontFamily;
+            return font.SizeInPoints * graphics.DpiY / 72f * family.GetCellAscent(font.Style) / family.GetEmHeight(font.Style);
+        }
+    }
+
+    // Recent runs, timing-screen style. Hovering a row shows a remove button; a best that
+    // dropped out of the recent list gets its own row at the bottom.
     private sealed class AttemptList : Control
     {
         private Attempt[] runs = new Attempt[0], rows = new Attempt[0];
@@ -327,6 +507,7 @@ internal static partial class RepeatCorner
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             BackColor = Theme.Background;
             ForeColor = Theme.Text;
+            Font = Theme.Type(10.5f);
             Margin = Padding.Empty;
         }
 
@@ -339,23 +520,25 @@ internal static partial class RepeatCorner
             hoverRow = -1;
             var lines = new string[recent.Length];
             for (int index = 0; index < recent.Length; index++)
-                lines[index] = string.Format("{0}: {1:0.000} seconds, {2}", RunLabel(index), recent[index].Seconds,
-                    IsPersonalBest(recent[index]) ? "personal best" : DeltaText(recent[index]) + " delta to personal best");
+                lines[index] = string.Format("{0}: {1:0.000} seconds, {2}", index == 0 ? "Last run" : (index + 1) + " runs ago",
+                    recent[index].Seconds,
+                    IsPersonalBest(recent[index]) ? "personal best" : DeltaText(recent[index]) + " to personal best");
             AccessibleDescription = string.Join("; ", lines);
             Invalidate();
         }
 
+        // Only the newest run and a separately listed best need naming; the rest read top to bottom.
         private string RunLabel(int index)
         {
-            return index >= runs.Length ? "Best" : index == 0 ? "Latest" : "Run " + (index + 1);
+            return index >= runs.Length ? "BEST" : index == 0 ? "LAST" : "";
         }
 
-        private int RowHeight { get { return (int)(38 * paintScale); } }
-        private int HeaderHeight { get { return (int)(30 * paintScale); } }
+        private int RowHeight { get { return (int)(36 * paintScale); } }
+        private int HeaderHeight { get { return (int)(28 * paintScale); } }
 
         private RectangleF RemoveBox(int row)
         {
-            float size = 26 * paintScale;
+            float size = 24 * paintScale;
             return new RectangleF(Width - size - 6 * paintScale, HeaderHeight + row * RowHeight + (RowHeight - size) / 2f, size, size);
         }
 
@@ -402,42 +585,41 @@ internal static partial class RepeatCorner
             float scale = Theme.Scale(graphics);
             paintScale = scale;
             graphics.Clear(BackColor);
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
             int rowHeight = RowHeight, headerHeight = HeaderHeight;
-            float[] widths = { 0.15f, 0.17f, 0.34f, 0.17f, 0.17f };
+            int inset = (int)(10 * scale);
+            float[] widths = { 0.14f, 0.22f, 0.22f, 0.21f, 0.21f };
             int tableWidth = Math.Max(0, Width - (int)(RemoveBox(0).Width + 12 * scale));
             var columns = new int[widths.Length + 1];
+            columns[0] = inset;
             for (int index = 0; index < widths.Length; index++)
-                columns[index + 1] = columns[index] + (int)(tableWidth * widths[index]);
+                columns[index + 1] = columns[index] + (int)((tableWidth - inset) * widths[index]);
             columns[widths.Length] = tableWidth;
 
-            using (var small = new Font(Font.FontFamily, 8.5f))
-            using (var bold = new Font(Font, FontStyle.Bold))
+            using (var label = Theme.Label(9))
+            using (var strong = Theme.Strong(11))
             using (var line = new Pen(Theme.Line))
             {
-                string[] headings = { "RUN", "TIME", "DELTA", "ENTRY", "EXIT" };
+                string[] headings = { "", "TIME", "DELTA", "ENTRY KM/H", "EXIT KM/H" };
                 for (int index = 0; index < headings.Length; index++)
-                    Cell(graphics, headings[index], small, Theme.Muted, columns, index, 0, headerHeight);
+                    Cell(graphics, headings[index], label, Theme.Muted, columns, index, 0, headerHeight);
                 graphics.DrawLine(line, 0, headerHeight - 1, Width, headerHeight - 1);
-
-                double spread = 0.1;
-                foreach (var run in runs)
-                    if (best != null) spread = Math.Max(spread, run.Seconds - best.Seconds);
 
                 for (int row = 0; row < rows.Length; row++)
                 {
                     var run = rows[row];
                     int top = headerHeight + row * rowHeight;
                     bool personalBest = IsPersonalBest(run);
-                    if (row == 0 || row == hoverRow)
-                        using (var highlight = new SolidBrush(row == 0 && row != hoverRow ? Theme.Surface : Theme.RowHover))
-                            graphics.FillRectangle(highlight, 0, top, Width, rowHeight - 1);
-                    var color = personalBest ? Theme.Green : Theme.Text;
-                    Cell(graphics, RunLabel(row), row == 0 ? bold : Font, row == 0 ? Theme.Text : Theme.Muted, columns, 0, top, rowHeight);
-                    Cell(graphics, run.Seconds.ToString("0.000"), bold, color, columns, 1, top, rowHeight);
-                    PaintDelta(graphics, run, personalBest, spread, scale, columns, top, rowHeight, small);
-                    Cell(graphics, FormatSpeed(run.EntrySpeed), Font, Theme.Muted, columns, 3, top, rowHeight);
-                    Cell(graphics, FormatSpeed(run.ExitSpeed), Font, Theme.Muted, columns, 4, top, rowHeight);
+                    if (row == hoverRow || row == 0)
+                        Theme.Fill(graphics, row == hoverRow ? Theme.RowHover : Theme.Surface,
+                            new RectangleF(0, top, Width, rowHeight - 1));
+                    Cell(graphics, RunLabel(row), label, Theme.Muted, columns, 0, top, rowHeight);
+                    Cell(graphics, run.Seconds.ToString("0.000"), strong, personalBest ? Theme.Green : Theme.Text, columns, 1, top, rowHeight);
+                    if (personalBest)
+                        Cell(graphics, "PB", strong, Theme.Green, columns, 2, top, rowHeight);
+                    else if (best != null)
+                        Cell(graphics, DeltaText(run), strong, Theme.Yellow, columns, 2, top, rowHeight);
+                    Cell(graphics, run.EntrySpeed.ToString("0"), Font, Theme.Muted, columns, 3, top, rowHeight);
+                    Cell(graphics, run.ExitSpeed.ToString("0"), Font, Theme.Muted, columns, 4, top, rowHeight);
                     graphics.DrawLine(line, 0, top + rowHeight - 1, Width, top + rowHeight - 1);
                     if (row == hoverRow) PaintRemove(graphics, RemoveBox(row), scale);
                 }
@@ -446,34 +628,15 @@ internal static partial class RepeatCorner
 
         private void PaintRemove(Graphics graphics, RectangleF box, float scale)
         {
-            Theme.FillRounded(graphics, hoverRemove ? Theme.Red : Theme.Inset, box, 5 * scale);
-            float inset = box.Width * 0.34f;
-            using (var pen = new Pen(Theme.Text, 1.6f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            Theme.Fill(graphics, hoverRemove ? Theme.Red : Theme.Inset, box);
+            float inset = box.Width * 0.32f;
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(Theme.Text, 1.6f * scale))
             {
                 graphics.DrawLine(pen, box.Left + inset, box.Top + inset, box.Right - inset, box.Bottom - inset);
                 graphics.DrawLine(pen, box.Right - inset, box.Top + inset, box.Left + inset, box.Bottom - inset);
             }
-        }
-
-        private void PaintDelta(Graphics graphics, Attempt run, bool personalBest, double spread, float scale,
-            int[] columns, int top, int height, Font small)
-        {
-            int left = columns[2], width = columns[3] - columns[2] - (int)(16 * scale);
-            if (personalBest)
-            {
-                var tag = new RectangleF(left, top + height / 2f - 9 * scale, 30 * scale, 18 * scale);
-                Theme.FillRounded(graphics, Color.FromArgb(48, Theme.Green), tag, 4 * scale);
-                TextRenderer.DrawText(graphics, "PB", small, Rectangle.Round(tag), Theme.Green,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-                return;
-            }
-            if (best == null) return;
-            double delta = run.Seconds - best.Seconds;
-            int textWidth = (int)(62 * scale);
-            Cell(graphics, DeltaText(run), Font, Theme.Amber, new[] { left, left + textWidth }, 0, top, height);
-            float barWidth = Math.Max(3 * scale, (float)(delta / spread) * (width - textWidth));
-            var bar = new RectangleF(left + textWidth, top + height / 2f - 3 * scale, barWidth, 6 * scale);
-            Theme.FillRounded(graphics, Color.FromArgb(150, Theme.Amber), bar, 3 * scale);
+            graphics.SmoothingMode = SmoothingMode.None;
         }
 
         private static void Cell(Graphics graphics, string text, Font font, Color color, int[] columns, int column, int top, int height)
@@ -507,9 +670,8 @@ internal static partial class RepeatCorner
             var graphics = e.Graphics;
             float scale = Theme.Scale(graphics);
             graphics.Clear(Theme.ParentColor(this));
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-            using (var keyFont = new Font(Font.FontFamily, 8.5f, FontStyle.Bold))
+            using (var keyFont = Theme.Strong(8.5f))
             {
                 float x = 0;
                 int capHeight = (int)(22 * scale), padding = (int)(7 * scale);
@@ -518,7 +680,7 @@ internal static partial class RepeatCorner
                 {
                     var keySize = TextRenderer.MeasureText(graphics, hint[0], keyFont, Size.Empty, flags);
                     var cap = new RectangleF(x, top, keySize.Width + padding * 2, capHeight);
-                    Theme.FillRounded(graphics, Theme.Inset, cap, 4 * scale);
+                    Theme.Fill(graphics, Theme.Inset, cap);
                     TextRenderer.DrawText(graphics, hint[0], keyFont, Rectangle.Round(cap), Theme.Text, Theme.Inset,
                         flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                     x = cap.Right + 7 * scale;

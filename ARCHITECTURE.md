@@ -90,7 +90,7 @@ There are two ways to set the lines:
 - **From the car.** Ctrl+Shift+K and Ctrl+Shift+L record the car's current lap position from telemetry.
 - **On a map.** The map dialog shows the circuit and turns a click into a lap position. A track map is 1,000 points, one per 0.1 % of the lap, in ACC world coordinates. `TrackMapView.Nearest` projects the click onto the nearest track segment and interpolates the lap position along it.
 
-Maps come from three sources, in priority order: one the user imported (a Race Element `.bin`), one of the 25 bundled maps, or one recorded by driving a lap, where each telemetry frame fills the slot for its lap position. The amber **Load** marker comes from the save file itself, which stores the car's spline position.
+Maps come from three sources, in priority order: one the user imported (a Race Element `.bin`), one of the 25 bundled maps, or one recorded by driving a lap, where each telemetry frame fills the slot for its lap position. The yellow **Load** marker comes from the save file itself, which stores the car's spline position.
 
 ## Persistence and diagnostics
 
