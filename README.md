@@ -4,7 +4,7 @@
 
 Repeat any stretch of track you choose in Assetto Corsa Competizione (ACC) without driving a full lap between attempts. Practice a braking zone, a single corner, a sequence of corners, or a whole sector. It works like iRacing's Active Reset: save in solo Free Practice just before the section, then press a wheel button to reset to that save and go again. ACC Repeat times the section between a start line and a finish line you set, shows your delta to your personal best (PB), and can reset you automatically after each run.
 
-![The ACC Repeat window showing a pinned Monza save, timing and loop controls, and five example runs with delta bars](docs/images/practice-desk.png)
+![The ACC Repeat window showing a pinned Monza save, timing and loop controls, the latest 28.912 run with its delta to the best, and five example runs](docs/images/practice-desk.png)
 
 ## Quick start
 
@@ -29,7 +29,7 @@ The tool reads the first 32 buttons that the device exposes through the Windows 
 
 ## Pin a save
 
-Select **Pin a save**, choose an ACC save, and give it a name such as **Monza Rettifilo** or **Spa Sector 2**. Creating another ACC save leaves the pin on its original save. Use **Active save** to switch between your pins or return to **Latest save**.
+Select **Pin a save**, choose an ACC save, and give it a name such as **Monza Rettifilo** or **Spa Sector 2**. Creating another ACC save leaves the pin on its original save. Use the **Practice save** list to switch between your pins or return to **Latest save**.
 
 To rename a pin, select **Pin a save**, choose the same ACC save, and enter the new name. The pin keeps its timing lines, PB, and recent runs.
 
@@ -45,13 +45,13 @@ Timing lines belong to the active pin or, in latest-save mode, the current track
 
 ### Place timing lines on the track map
 
-Instead of pressing the shortcuts at the right moment, select **Place on map…** in the app. Choose **Start** or **Finish**, then click the track where you want that line. The highlighted stretch between them is the timed section. Select **Save lines** to use them. Moving either line starts a new run history.
+Instead of pressing the shortcuts at the right moment, select **Set on map…** in the app. Choose **Start** or **Finish**, then click the track where you want that line. The red stretch between them is the timed section. Select **Save lines** to use them. Moving either line starts a new run history.
 
 Scroll over a corner to zoom toward it, or use **+** and **−**. While zoomed in, drag with the right mouse button to move around. **Fit** shows the whole circuit again.
 
-The amber **Load** diamond shows where your selected save places the car on the circuit. Its percentage is the saved position along the lap. Place the start line far enough ahead to give yourself a run-up after loading.
+The yellow **Load** diamond shows where your selected save places the car on the circuit. Its percentage is the saved position along the lap. Place the start line far enough ahead to give yourself a run-up after loading.
 
-![The Monza track map with zoom controls, an amber Load diamond, and a highlighted section between the start and finish lines](docs/images/track-map.png)
+![The Monza track map with zoom controls, a yellow Load diamond, and a red section between the start and finish lines](docs/images/track-map.png)
 
 ACC Repeat includes 25 ACC maps and loads the one for your selected save automatically. Nürburgring GP and Nürburgring 24h each have their own map. The DLC is required to drive DLC layouts in ACC. See the [map credits and license](Maps/README.md).
 
@@ -59,9 +59,9 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 ### Review your runs
 
-**Last attempt** shows your section time and entry and exit speeds. The delta to your previous PB is green (negative) when you go quicker and amber (positive) when you go slower.
+The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower, followed by your **Best** and the run's **Entry** and **Exit** speeds.
 
-**Recent attempts** lists your last five runs, newest first. The **DELTA** column shows each run's delta to your current PB. A longer bar means a bigger delta, and the **PB** badge marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
+The table lists your last five runs, newest first, with the newest marked **LAST**. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
 
 History is stored with the timing lines in `ACCRepeat.settings.json`. Moving either line starts a new history for that section.
 
@@ -75,7 +75,7 @@ This pilot uses geometric boundaries. ACC also applies track-specific rules, sur
 
 ### Remove a run
 
-To remove a run you don't want counted, hover over it in **Recent attempts** and select the **×** at the end of the row, then confirm. If your PB has dropped out of the last five runs, it gets its own **Best** row so you can remove it too. When you remove your PB, the quickest run left in the list becomes your PB. Removing a run can't be undone. In the console version, use `history remove <1-5>` or `history remove best`.
+To remove a run you don't want counted, hover over it in the run table and select the **×** at the end of the row, then confirm. If your PB has dropped out of the last five runs, it gets its own **Best** row so you can remove it too. When you remove your PB, the quickest run left in the list becomes your PB. Removing a run can't be undone. In the console version, use `history remove <1-5>` or `history remove best`.
 
 ### Run a hands-free loop
 
@@ -87,9 +87,9 @@ Press **F9** in ACC or select **Disarm loop** to turn the loop off. Press your w
 
 ## In-game overlay
 
-During Free Practice in windowed or borderless mode, the overlay shows your live section time between the timing lines. After the finish it shows your result and delta to your PB. During an auto-reset countdown it also shows the seconds remaining.
+During Free Practice in windowed or borderless mode, the overlay shows your live section time between the timing lines. After the finish it shows your result and delta to your PB. During an auto-reset countdown it also shows the seconds remaining. The title bar turns red while a run is live or a timing line is missing, green for a new PB, and yellow when the tyres went outside the track limits.
 
-![The overlay showing a 28.912 s run, +0.495 s delta to the PB, with the auto-reset countdown](docs/images/overlay.png)
+![The overlay showing a 28.912 run, +0.495 to the best, the auto-reset countdown and the 28.417 best](docs/images/overlay.png)
 
 Use **In-game overlay** in the app to choose **Top centre**, **Top left**, **Top right**, **Bottom centre**, or **Off**. The default position is **Top centre**. The panel lets clicks pass through to ACC and hides on the main menu, during a reset, and when ACC loses focus.
 

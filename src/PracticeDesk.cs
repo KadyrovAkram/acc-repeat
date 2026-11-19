@@ -35,19 +35,20 @@ internal static partial class RepeatCorner
         private readonly PillButton loopButton = new PillButton("Arm loop");
         private readonly PillButton bindButton = new PillButton("Bind wheel");
         private readonly PillButton clearWheel = new PillButton("Clear");
-        private readonly PillButton mapMarkers = new PillButton("Place on map…");
+        private readonly PillButton mapMarkers = new PillButton("Set on map…");
         private readonly Stepper delay = new Stepper("Countdown", 1, 30, 3);
-        private readonly Label connection = Caption("Waiting for ACC", 10);
-        private readonly Label checkpointDetail = Caption("", 9);
-        private readonly Label start = Caption("Start   —", 10);
-        private readonly Label finish = Caption("Finish   —", 10);
-        private readonly Label status = Caption("Starting…", 10);
-        private readonly Label wheel = Caption("Wheel unbound", 9);
-        private readonly Label detail = Caption("", 9);
-        private readonly Label time = Caption("—", 40);
-        private readonly Label best = Caption("Personal best   —", 11);
-        private readonly Label entry = Caption("—", 17);
-        private readonly Label exit = Caption("—", 17);
+        private readonly ConnectionBadge connection = new ConnectionBadge();
+        private readonly Label checkpointDetail = Caption("", 9.5f);
+        private readonly Readout start = new Readout("Start");
+        private readonly Readout finish = new Readout("Finish");
+        private readonly Label status = Caption("Starting…", 10.5f);
+        private readonly Label wheel = Caption("Wheel unbound", 9.5f);
+        private readonly Label detail = Caption("", 9.5f);
+        private readonly FlushLabel time = new FlushLabel(52, false) { Text = "—", BaselineInset = 14 };
+        private readonly FlushLabel delta = new FlushLabel(12.5f, true);
+        private readonly Readout best = new Readout("Best");
+        private readonly Readout entry = new Readout("Entry");
+        private readonly Readout exit = new Readout("Exit");
         private readonly Label emptyHistory = Caption("Cross both timing lines to record a run.", 10);
         private readonly AttemptList history = new AttemptList { Dock = DockStyle.Fill, Visible = false };
         private TableLayoutPanel wheelRow;
@@ -62,7 +63,7 @@ internal static partial class RepeatCorner
             this.session = session;
             SuspendLayout();
             Text = "ACC Repeat";
-            Font = new Font("Segoe UI", 10);
+            Font = Theme.Type(10.5f);
             BackColor = Theme.Background;
             ForeColor = Theme.Text;
             ClientSize = new Size(1000, 698);
@@ -71,7 +72,7 @@ internal static partial class RepeatCorner
             Theme.UseDarkTitleBar(this);
 
             var root = Stack(1);
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 57));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
             root.Controls.Add(BuildHeader(), 0, 0);
@@ -132,53 +133,44 @@ internal static partial class RepeatCorner
 
         private Control BuildHeader()
         {
-            var header = Stack(3);
-            header.BackColor = Theme.Surface;
-            header.Padding = new Padding(18, 9, 18, 9);
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
+            var header = Stack(2);
+            header.BackColor = Theme.Background;
+            header.Padding = new Padding(20, 6, 20, 6);
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-            var mark = Caption("AR", 11);
-            mark.BackColor = Theme.Red;
-            mark.Font = new Font("Segoe UI", 11, FontStyle.Bold | FontStyle.Italic);
-            mark.TextAlign = ContentAlignment.MiddleCenter;
-            mark.Margin = new Padding(0, 4, 7, 4);
-            var title = Caption("ACC Repeat", 15);
-            title.Margin = new Padding(8, 0, 0, 0);
-            connection.TextAlign = ContentAlignment.MiddleRight;
-            header.Controls.Add(mark, 0, 0);
-            header.Controls.Add(title, 1, 0);
-            header.Controls.Add(connection, 2, 0);
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
+            var title = new FlushLabel(14, true) { Text = "ACC Repeat" };
+            header.Controls.Add(title, 0, 0);
+            header.Controls.Add(connection, 1, 0);
+            header.Paint += (sender, args) =>
+            {
+                using (var line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, header.Height - 1, header.Width, header.Height - 1);
+            };
             return header;
         }
 
         private Control BuildSidebar()
         {
             var sidebar = Stack(1);
-            sidebar.Padding = new Padding(18, 10, 16, 8);
+            sidebar.Padding = new Padding(20, 8, 14, 8);
             sidebar.BackColor = Theme.Surface;
-            AddRow(sidebar, SectionHeading("Active save"), 26);
+            AddRow(sidebar, SectionHeading("Practice save", false), 28);
             checkpoint.Dock = DockStyle.Fill;
             AddRow(sidebar, checkpoint, 36);
             checkpointDetail.ForeColor = Theme.Muted;
             AddRow(sidebar, checkpointDetail, 26);
             AddRow(sidebar, pinButton, 36);
 
-            AddRow(sidebar, SectionHeading("Timing section"), 36);
-            var markers = TwoColumns(start, finish);
-            markers.BackColor = Theme.Inset;
-            markers.Padding = new Padding(10, 0, 6, 0);
-            markers.Margin = new Padding(0, 0, 6, 0);
-            AddRow(sidebar, markers, 34);
-            AddRow(sidebar, mapMarkers, 38);
+            AddRow(sidebar, SectionHeading("Timing lines", true), 42);
+            AddRow(sidebar, TwoColumns(start, finish), 30);
+            AddRow(sidebar, mapMarkers, 36);
 
-            AddRow(sidebar, SectionHeading("Hands-free loop"), 36);
-            AddRow(sidebar, status, 30);
+            AddRow(sidebar, SectionHeading("Loop", true), 42);
+            AddRow(sidebar, status, 28);
             var countdown = Stack(2);
             countdown.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             countdown.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             countdown.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126));
-            var countdownLabel = Caption("Countdown", 9);
+            var countdownLabel = Caption("Countdown", 10);
             countdownLabel.ForeColor = Theme.Muted;
             countdown.Controls.Add(countdownLabel, 0, 0);
             delay.Margin = new Padding(0, 0, 6, 0);
@@ -187,13 +179,13 @@ internal static partial class RepeatCorner
             loopButton.Primary = true;
             AddRow(sidebar, loopButton, 38);
 
-            AddRow(sidebar, SectionHeading("Wheel reset"), 36);
+            AddRow(sidebar, SectionHeading("Wheel reset", true), 42);
             wheel.ForeColor = Theme.Muted;
             AddRow(sidebar, wheel, 24);
             wheelRow = TwoColumns(bindButton, clearWheel);
             AddRow(sidebar, wheelRow, 36);
 
-            AddRow(sidebar, SectionHeading("In-game overlay"), 36);
+            AddRow(sidebar, SectionHeading("In-game overlay", true), 42);
             overlayPosition.Dock = DockStyle.Fill;
             overlayPosition.Items.AddRange(OverlayPositions.Cast<object>().ToArray());
             overlayPosition.SelectedIndex = 1;
@@ -203,38 +195,49 @@ internal static partial class RepeatCorner
             return sidebar;
         }
 
+        // The newest run's time leads; its delta and speeds sit under it, then the run history.
         private Control BuildResults()
         {
             var results = Stack(1);
-            results.Padding = new Padding(26, 14, 26, 8);
-            AddRow(results, SectionHeading("Last attempt"), 22);
-            time.Font = new Font("Segoe UI", 40, FontStyle.Bold);
-            time.Margin = new Padding(0, 0, 0, 0);
-            AddRow(results, time, 72);
-            AddRow(results, best, 30);
-            AddRow(results, TwoColumns(SpeedCard("Entry speed", entry), SpeedCard("Exit speed", exit)), 70);
-            AddRow(results, SectionHeading("Recent attempts"), 40);
+            results.Padding = new Padding(28, 10, 24, 8);
+            time.Font = Theme.Type(52, FontStyle.Bold);
+            AddRow(results, time, 92);
+            AddRow(results, delta, 28);
+            var readouts = Stack(3);
+            readouts.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            readouts.Controls.Add(best, 0, 0);
+            readouts.Controls.Add(entry, 1, 0);
+            readouts.Controls.Add(exit, 2, 0);
+            AddRow(results, readouts, 34);
+            AddRow(results, new Panel { Margin = Padding.Empty }, 24);
             var historySurface = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             historySurface.Controls.Add(history);
             emptyHistory.ForeColor = Theme.Muted;
             emptyHistory.TextAlign = ContentAlignment.TopLeft;
-            emptyHistory.Padding = new Padding(0, 12, 0, 0);
+            emptyHistory.Padding = new Padding(0, 4, 0, 0);
             historySurface.Controls.Add(emptyHistory);
             results.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            results.Controls.Add(historySurface, 0, 5);
+            results.Controls.Add(historySurface, 0, 4);
             return results;
         }
 
         private Control BuildFooter()
         {
             var footer = Stack(1);
-            footer.BackColor = Theme.Surface;
-            footer.Padding = new Padding(18, 6, 18, 0);
+            footer.BackColor = Theme.Background;
+            footer.Padding = new Padding(20, 6, 20, 0);
+            footer.Paint += (sender, args) =>
+            {
+                using (var line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, 0, footer.Width, 0);
+            };
             var keys = new KeyHints(
                 new[] { "Ctrl+Shift+J", "Reset" }, new[] { "Ctrl+Shift+K", "Mark start" },
                 new[] { "Ctrl+Shift+L", "Mark finish" }, new[] { "F9", "Disarm loop" })
             {
-                Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9)
+                Dock = DockStyle.Fill, Font = Theme.Type(9.5f)
             };
             AddRow(footer, keys, 28);
             detail.ForeColor = Theme.Muted;
@@ -288,10 +291,8 @@ internal static partial class RepeatCorner
                 nameField.Click += (source, click) => name.Focus();
                 nameField.Paint += (source, paint) =>
                 {
-                    float fieldScale = Theme.Scale(paint.Graphics);
-                    paint.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                    var edge = new RectangleF(0.5f, 0.5f, nameField.Width - 1.5f, nameField.Height - 1.5f);
-                    Theme.OutlineRounded(paint.Graphics, name.Focused ? Theme.Muted : Theme.Line, edge, 6 * fieldScale, 1.2f * fieldScale);
+                    if (name.Focused)
+                        Theme.Outline(paint.Graphics, Theme.Muted, nameField.ClientRectangle, 1.2f * Theme.Scale(paint.Graphics));
                 };
                 name.GotFocus += (source, focus) => nameField.Invalidate();
                 name.LostFocus += (source, focus) => nameField.Invalidate();
@@ -300,9 +301,9 @@ internal static partial class RepeatCorner
                 var cancel = new PillButton("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;
                 name.TextChanged += (source, change) => accept.Enabled = name.Text.Trim().Length != 0 && saves.SelectedIndex >= 0;
-                AddRow(body, SectionHeading("Free Practice save"), 25);
+                AddRow(body, SectionHeading("Free Practice save", false), 25);
                 AddRow(body, saves, 38);
-                AddRow(body, SectionHeading("Pin name"), 30);
+                AddRow(body, SectionHeading("Pin name", false), 30);
                 AddRow(body, nameField, 38);
                 AddRow(body, TwoColumns(cancel, accept), 40);
                 dialog.Controls.Add(body);
@@ -352,13 +353,12 @@ internal static partial class RepeatCorner
             {
                 SetActions(false);
                 status.Text = "ACC Repeat could not start";
-                status.ForeColor = Theme.Amber;
+                status.ForeColor = Theme.Yellow;
                 detail.Text = view.Error;
                 return;
             }
 
-            connection.Text = view.Connected ? "●  ACC connected" : "○  Waiting for ACC";
-            connection.ForeColor = view.Connected ? Theme.Green : Theme.Muted;
+            connection.Connected = view.Connected;
             if (checkpoint.Items.Count == 0 || !pinNames.SequenceEqual(view.PinNames))
             {
                 pinNames = view.PinNames;
@@ -375,16 +375,14 @@ internal static partial class RepeatCorner
             if (overlayIndex >= 0 && !overlayPosition.DroppedDown && overlayPosition.SelectedIndex != overlayIndex)
                 overlayPosition.SelectedIndex = overlayIndex;
             checkpointDetail.Text = view.CheckpointDetail;
-            start.Text = "Start   " + FormatMarker(view.Start);
-            finish.Text = "Finish   " + FormatMarker(view.Finish);
-            start.ForeColor = view.Start.HasValue ? Theme.Text : Theme.Muted;
-            finish.ForeColor = view.Finish.HasValue ? Theme.Text : Theme.Muted;
+            start.Value = FormatMarker(view.Start);
+            finish.Value = FormatMarker(view.Finish);
             status.Text = view.Status;
-            status.ForeColor = view.LoopArmed && !view.Reloading ? Theme.Green : Theme.Text;
+            status.ForeColor = Theme.Text;
             detail.Text = string.IsNullOrEmpty(view.ShortcutWarning) ? view.Detail : view.ShortcutWarning;
-            detail.ForeColor = string.IsNullOrEmpty(view.ShortcutWarning) ? Theme.Muted : Theme.Amber;
+            detail.ForeColor = string.IsNullOrEmpty(view.ShortcutWarning) ? Theme.Muted : Theme.Yellow;
             wheel.Text = view.LearningWheel ? "Press a wheel button now…" : view.Wheel == null ? "No wheel button bound" :
-                "Button " + (view.Wheel.Button + 1) + " · " + view.Wheel.Device;
+                "Button " + (view.Wheel.Button + 1) + " on " + view.Wheel.Device;
             bindButton.Text = view.LearningWheel ? "Cancel" : view.Wheel == null ? "Bind wheel" : "Rebind";
             loopButton.Text = view.LoopArmed ? "Disarm loop" : "Arm loop";
             SetActions(!view.Reloading);
@@ -411,25 +409,34 @@ internal static partial class RepeatCorner
         private void RenderResults(DeskSnapshot view)
         {
             var last = view.Recent.FirstOrDefault();
-            time.Text = last == null ? "—" : last.Seconds.ToString("0.000") + " s";
+            time.Text = last == null ? "—" : last.Seconds.ToString("0.000");
             time.ForeColor = last == null ? Theme.Faint : IsBest(last, view.Best) ? Theme.Green : Theme.Text;
-            entry.Text = last == null ? "—" : FormatSpeed(last.EntrySpeed);
-            exit.Text = last == null ? "—" : FormatSpeed(last.ExitSpeed);
-            string personalBest = view.Best == null ? "Personal best   —" : string.Format("Personal best   {0:0.000} s", view.Best.Seconds);
-            best.Text = personalBest;
-            best.ForeColor = Theme.Muted;
-            if (last != null && last.PreviousBestDelta.HasValue)
+            entry.Value = last == null ? "—" : FormatSpeed(last.EntrySpeed);
+            exit.Value = last == null ? "—" : FormatSpeed(last.ExitSpeed);
+            best.Value = view.Best == null ? "—" : view.Best.Seconds.ToString("0.000");
+            best.ValueColor = view.Best == null ? Theme.Text : Theme.Green;
+
+            delta.Text = "";
+            if (last != null && last.PreviousBestDelta.HasValue && last.PreviousBestDelta.Value < 0)
             {
-                best.Text = string.Format("Delta {0:+0.000;-0.000;0.000} s to previous PB   ·   {1}", last.PreviousBestDelta.Value, personalBest);
-                best.ForeColor = last.PreviousBestDelta.Value < 0 ? Theme.Green : Theme.Amber;
+                delta.Text = string.Format("New personal best, {0:0.000} faster", -last.PreviousBestDelta.Value);
+                delta.ForeColor = Theme.Green;
+            }
+            else if (last != null && last.PreviousBestDelta.HasValue)
+            {
+                delta.Text = string.Format("{0:+0.000;-0.000;0.000} to the previous best", last.PreviousBestDelta.Value);
+                delta.ForeColor = Theme.Yellow;
             }
             else if (last != null && view.Best != null && !IsBest(last, view.Best))
             {
-                best.Text = string.Format("Delta {0:+0.000;-0.000;0.000} s to PB   ·   {1}", last.Seconds - view.Best.Seconds, personalBest);
-                best.ForeColor = Theme.Amber;
+                delta.Text = string.Format("{0:+0.000;-0.000;0.000} to your best", last.Seconds - view.Best.Seconds);
+                delta.ForeColor = Theme.Yellow;
             }
             else if (IsBest(last, view.Best))
-                best.ForeColor = Theme.Green;
+            {
+                delta.Text = "Personal best";
+                delta.ForeColor = Theme.Green;
+            }
 
             if (!displayedAttempts.SequenceEqual(view.Recent) || displayedBest != view.Best)
             {
@@ -442,7 +449,7 @@ internal static partial class RepeatCorner
             emptyHistory.Visible = !hasAttempts;
             emptyHistory.Text = view.Finish.HasValue ? "Cross both timing lines to record a run." :
                 view.Start.HasValue ? "In ACC, press Ctrl+Shift+L after the exit to mark the finish." :
-                "Select Place on map to click the timing lines onto the track, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
+                "Select Set on map to click the timing lines onto the track, or press Ctrl+Shift+K and Ctrl+Shift+L in ACC.";
         }
 
         private static bool IsBest(Attempt run, Attempt best)
@@ -478,36 +485,30 @@ internal static partial class RepeatCorner
             return row;
         }
 
-        private static Control SpeedCard(string name, Label value)
-        {
-            var card = Stack(1);
-            card.BackColor = Theme.Surface;
-            card.Margin = new Padding(0, 4, 12, 4);
-            card.Padding = new Padding(12, 5, 8, 3);
-            card.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
-            card.RowStyles.Add(new RowStyle(SizeType.Percent, 62));
-            card.Controls.Add(SectionHeading(name), 0, 0);
-            card.Controls.Add(value, 0, 1);
-            return card;
-        }
-
         private static Label Caption(string text, float size)
         {
             return new Label
             {
-                Text = text, Font = new Font("Segoe UI", size), Dock = DockStyle.Fill,
+                Text = text, Font = Theme.Type(size), Dock = DockStyle.Fill,
                 ForeColor = Theme.Text, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty,
                 AutoEllipsis = true, UseMnemonic = false
             };
         }
 
-        private static Label SectionHeading(string text)
+        // A condensed capital group title; groups after the first get a rule above them.
+        private static Label SectionHeading(string text, bool rule)
         {
-            var label = Caption(text.ToUpperInvariant(), 8.5f);
-            label.Font = new Font("Segoe UI Semibold", 8.5f);
+            var label = Caption(text.ToUpperInvariant(), 10);
+            label.Font = Theme.Label(10);
             label.ForeColor = Theme.Muted;
             label.TextAlign = ContentAlignment.BottomLeft;
             label.Padding = new Padding(0, 0, 0, 5);
+            label.Margin = new Padding(0, 0, 6, 0);
+            if (rule)
+                label.Paint += (sender, args) =>
+                {
+                    using (var line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, 6, label.Width, 6);
+                };
             return label;
         }
     }

@@ -88,7 +88,7 @@ internal static partial class RepeatCorner
 
             var content = Describe(view);
             float scale = Math.Max(0.75f, Math.Min(2.5f, client.Height / 1080f));
-            var size = new Size((int)(300 * scale), (int)(86 * scale));
+            var size = new Size((int)(300 * scale), (int)(100 * scale));
             int margin = (int)(18 * scale);
             var position = new Point(client.Left + (client.Width - size.Width) / 2, client.Top + margin);
             if (view.OverlayPosition == "Top left") position.X = client.Left + margin;
@@ -168,33 +168,36 @@ internal static partial class RepeatCorner
             return client.Width >= 320 && client.Height >= 240;
         }
 
-        // [caption, value, delta, footer, accent: "red" | "green" | "amber", value style: "time" | "text", delta colour]
+        // [title, value, delta, footer, title bar: "grey" | "red" | "green" | "yellow", value style: "time" | "text",
+        //  delta colour, footer right]
+        // The title bar follows ACC's HUD widgets and timing colours: red while a run is live or a
+        // line is missing, green for a personal best, yellow for an invalid run.
         internal static string[] Describe(DeskSnapshot view)
         {
             string loop = view.Countdown.HasValue ? "Auto-reset in " + view.Countdown.Value + " s" :
-                view.LoopArmed ? "Loop armed" : null;
-            string personalBest = view.Best == null ? null : "PB " + view.Best.Seconds.ToString("0.000");
-            string footer = string.Join("   ·   ", new[] { loop, personalBest }.Where(part => part != null).ToArray());
+                view.LoopArmed ? "Loop armed" : "";
+            string personalBest = view.Best == null ? "" : "Best " + view.Best.Seconds.ToString("0.000");
 
             if (!view.Start.HasValue)
-                return new[] { "TIMING", "Mark start", "", "Ctrl+Shift+K just before braking", "red", "text", "" };
+                return new[] { "TIMING LINES", "Mark start", "", "Ctrl+Shift+K just before braking", "red", "text", "", "" };
             if (!view.Finish.HasValue)
-                return new[] { "TIMING", "Mark finish", "", "Ctrl+Shift+L after the exit", "red", "text", "" };
+                return new[] { "TIMING LINES", "Mark finish", "", "Ctrl+Shift+L after the exit", "red", "text", "", "" };
             if (view.LiveStart.HasValue)
             {
                 double elapsed = Math.Max(0, sectionClock.Elapsed.TotalSeconds - view.LiveStart.Value);
-                return new[] { "LIVE", elapsed.ToString("0.0"), "", footer, "red", "time", "" };
+                return new[] { "LIVE", elapsed.ToString("0.0"), "", loop, "red", "time", "", personalBest };
             }
             if (view.LastInvalid != null)
-                return new[] { "INVALID · TRACK LIMITS", view.LastInvalid.Seconds.ToString("0.000"),
-                    "Tyres outside", footer, "amber", "time", "amber" };
+                return new[] { "TRACK LIMITS", view.LastInvalid.Seconds.ToString("0.000"),
+                    "INVALID", loop, "yellow", "time", "yellow", personalBest };
 
             var last = view.Recent.FirstOrDefault();
             if (last == null)
-                return new[] { "READY", "—", "", footer.Length == 0 ? "Cross both timing lines to time a run" : footer, "red", "time", "" };
+                return new[] { "READY", "—", "", loop.Length == 0 ? "Cross both timing lines to time a run" : loop,
+                    "grey", "time", "", personalBest };
 
             bool isBest = view.Best != null && last.Seconds == view.Best.Seconds;
-            string delta = "", deltaColour = "amber";
+            string delta = "", deltaColour = "yellow";
             if (isBest)
             {
                 delta = last.PreviousBestDelta.HasValue ? last.PreviousBestDelta.Value.ToString("+0.000;-0.000;0.000") : "PB";
@@ -202,13 +205,14 @@ internal static partial class RepeatCorner
             }
             else if (view.Best != null)
                 delta = (last.Seconds - view.Best.Seconds).ToString("+0.000;-0.000;0.000");
-            string accent = view.Countdown.HasValue ? "amber" : isBest ? "green" : "red";
-            return new[] { "LAST RUN", last.Seconds.ToString("0.000"), delta, footer, accent, "time", deltaColour };
+            return new[] { isBest ? "PERSONAL BEST" : "LAST RUN", last.Seconds.ToString("0.000"), delta, loop,
+                isBest ? "green" : "grey", "time", deltaColour, isBest ? "" : personalBest };
         }
 
         private static Color Named(string colour)
         {
-            return colour == "green" ? Theme.Green : colour == "amber" ? Theme.Amber : Theme.Red;
+            return colour == "green" ? Theme.Green : colour == "yellow" ? Theme.Yellow :
+                colour == "red" ? Theme.Red : Color.FromArgb(206, 206, 206);
         }
 
         private bool Draw(string[] content, Point position, Size size, float scale)
@@ -226,40 +230,28 @@ internal static partial class RepeatCorner
                     graphics.SmoothingMode = SmoothingMode.AntiAlias;
                     graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                     graphics.Clear(Color.Transparent);
-                    var bounds = new RectangleF(0, 0, size.Width - 1, size.Height - 1);
-                    using (var panel = Theme.Rounded(bounds, 10 * scale))
-                    {
-                        using (var fill = new SolidBrush(Color.FromArgb(228, 18, 19, 23)))
-                            graphics.FillPath(fill, panel);
-                        graphics.SetClip(panel);
-                        using (var accent = new SolidBrush(Named(content[4])))
-                            graphics.FillRectangle(accent, 0, 0, 4 * scale, size.Height);
-                        graphics.ResetClip();
-                    }
+                    // A 300 x 100 grid at scale 1: a 22 px title bar, 14 px side margins, and the main
+                    // value and footer placed so the gaps above, between and below them are even.
+                    float bar = 22 * scale;
+                    using (var fill = new SolidBrush(Named(content[4]))) graphics.FillRectangle(fill, 0, 0, size.Width, bar);
+                    using (var fill = new SolidBrush(Color.FromArgb(230, 10, 10, 10)))
+                        graphics.FillRectangle(fill, 0, bar, size.Width, size.Height - bar);
 
-                    float left = 18 * scale, right = size.Width - 16 * scale;
-                    using (var caption = new Font("Segoe UI Semibold", 11 * scale, GraphicsUnit.Pixel))
-                    using (var value = content[5] == "time" ? new Font("Segoe UI", 34 * scale, FontStyle.Bold, GraphicsUnit.Pixel) :
-                        new Font("Segoe UI", 24 * scale, FontStyle.Bold, GraphicsUnit.Pixel))
-                    using (var delta = new Font("Segoe UI", 20 * scale, FontStyle.Bold, GraphicsUnit.Pixel))
-                    using (var footer = new Font("Segoe UI", 12.5f * scale, GraphicsUnit.Pixel))
-                    using (var muted = new SolidBrush(Theme.Muted))
-                    using (var text = new SolidBrush(Theme.Text))
-                    using (var nearRight = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center })
-                    using (var noWrap = new StringFormat { FormatFlags = StringFormatFlags.NoWrap, Trimming = StringTrimming.EllipsisCharacter })
+                    float left = 14 * scale, right = size.Width - 14 * scale;
+                    float valueBaseline = 64 * scale, footerBaseline = 87 * scale;
+                    using (var caption = Theme.Label(13 * scale, GraphicsUnit.Pixel))
+                    using (var value = Theme.Type((content[5] == "time" ? 40 : 28) * scale, FontStyle.Bold, GraphicsUnit.Pixel))
+                    using (var delta = Theme.Strong(22 * scale, GraphicsUnit.Pixel))
+                    using (var footer = Theme.Type(13 * scale, FontStyle.Regular, GraphicsUnit.Pixel))
                     {
-                        graphics.DrawString(content[0], caption, muted, left, 8 * scale);
-                        float valueTop = content[5] == "time" ? 18 * scale : 24 * scale;
-                        graphics.DrawString(content[1], value, text, left - 2 * scale, valueTop);
-                        if (content[2].Length != 0)
-                            using (var deltaBrush = new SolidBrush(Named(content[6])))
-                                graphics.DrawString(content[2], delta, deltaBrush,
-                                    new RectangleF(left, 18 * scale, right - left, 44 * scale), nearRight);
-                        var footerColour = content[3].StartsWith("Auto-reset") ? Theme.Amber :
-                            content[3].StartsWith("Loop armed") ? Theme.Green : Theme.Muted;
-                        using (var footerBrush = new SolidBrush(footerColour))
-                            graphics.DrawString(content[3], footer, footerBrush,
-                                new RectangleF(left, 62 * scale, right - left, 20 * scale), noWrap);
+                        float captionBaseline = (bar + Theme.CapHeight(caption, graphics)) / 2;
+                        Theme.DrawInk(graphics, content[0], caption, content[4] == "red" ? Color.White : Color.FromArgb(14, 14, 14),
+                            left, captionBaseline, false);
+                        Theme.DrawInk(graphics, content[1], value, Theme.Text, left, valueBaseline, false);
+                        Theme.DrawInk(graphics, content[2], delta, Named(content[6]), right, valueBaseline, true);
+                        Theme.DrawInk(graphics, content[3], footer, content[3].StartsWith("Auto-reset") ? Theme.Yellow : Theme.Muted,
+                            left, footerBaseline, false);
+                        Theme.DrawInk(graphics, content[7], footer, Theme.Muted, right, footerBaseline, true);
                     }
                 }
             }

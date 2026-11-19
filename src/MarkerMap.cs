@@ -20,7 +20,7 @@ internal static partial class RepeatCorner
         private readonly Label positions = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false, AutoEllipsis = true };
         private readonly Label loadLegend = new Label
         {
-            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Amber, AutoEllipsis = true
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Yellow, AutoEllipsis = true
         };
         private readonly Timer refresh = new Timer { Interval = 500 };
         private readonly double? originalStart, originalFinish;
@@ -35,7 +35,7 @@ internal static partial class RepeatCorner
             canvas.Map = view.Map;
             ShowLoadPosition(view.LoadPosition);
 
-            Text = "Timing lines · " + (view.TrackName ?? track);
+            Text = "Timing lines: " + (view.TrackName ?? track);
             BackColor = Theme.Surface;
             ForeColor = Theme.Text;
             Font = font;
@@ -81,7 +81,7 @@ internal static partial class RepeatCorner
             var fitTrack = new PillButton("Fit") { AccessibleName = "Fit whole track" };
             var mapHelp = new Label
             {
-                Text = "Scroll to zoom · Right-drag to pan", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                Text = "Scroll to zoom, right-drag to pan", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Theme.Muted, Margin = new Padding(6, 0, 0, 0), UseMnemonic = false, AutoEllipsis = true
             };
             mapTools.Controls.Add(zoomOut, 0, 0);
@@ -233,9 +233,9 @@ internal static partial class RepeatCorner
         {
             string problem = Problem();
             bool changed = canvas.Start != originalStart || canvas.Finish != originalFinish;
-            positions.Text = problem ?? string.Format("Start {0:0.00%}   ·   Finish {1:0.00%}{2}", canvas.Start.Value,
-                canvas.Finish.Value, changed ? "   ·   saving starts a new run history" : "");
-            positions.ForeColor = problem == null ? Theme.Muted : Theme.Amber;
+            positions.Text = problem ?? string.Format("Start {0:0.00%}     Finish {1:0.00%}{2}", canvas.Start.Value,
+                canvas.Finish.Value, changed ? "     Saving starts a new run history." : "");
+            positions.ForeColor = problem == null ? Theme.Muted : Theme.Yellow;
             save.Enabled = problem == null && changed;
         }
 
@@ -480,14 +480,14 @@ internal static partial class RepeatCorner
                     var box = new RectangleF(at.X - boxWidth / 2, at.Y - 18 * dpi - boxHeight, boxWidth, boxHeight);
                     if (box.Top < 0) box.Y = at.Y + 18 * dpi;
                     box.X = Math.Max(2, Math.Min(Width - boxWidth - 2, box.X));
-                    Theme.FillRounded(graphics, Theme.Surface, box, 4 * dpi);
+                    Theme.Fill(graphics, Theme.Surface, box);
                     TextRenderer.DrawText(graphics, label, Font, Rectangle.Round(box), colour, Theme.Surface,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
                 }
             }
             if (Map.Coverage < 0.98)
                 TextRenderer.DrawText(graphics, string.Format("Map {0:0%} recorded. Drive a full lap to complete it.", Map.Coverage),
-                    Font, new Rectangle(8, Height - (int)(30 * dpi), Width - 16, (int)(26 * dpi)), Theme.Amber,
+                    Font, new Rectangle(8, Height - (int)(30 * dpi), Width - 16, (int)(26 * dpi)), Theme.Yellow,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
 
@@ -565,7 +565,7 @@ internal static partial class RepeatCorner
                 new PointF(at.X, at.Y - radius), new PointF(at.X + radius, at.Y),
                 new PointF(at.X, at.Y + radius), new PointF(at.X - radius, at.Y)
             };
-            using (var fill = new SolidBrush(Theme.Amber)) graphics.FillPolygon(fill, diamond);
+            using (var fill = new SolidBrush(Theme.Yellow)) graphics.FillPolygon(fill, diamond);
             using (var edge = new Pen(Theme.Background, 2 * dpi)) graphics.DrawPolygon(edge, diamond);
         }
 

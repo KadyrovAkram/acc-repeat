@@ -89,7 +89,7 @@ internal static partial class RepeatCorner
                 catch (InvalidOperationException error) { checkpointDetail = error.Message; }
             }
             if (selected != null)
-                checkpointDetail = (selected.TrackDisplayName ?? selected.Track) + " · Free Practice";
+                checkpointDetail = (selected.TrackDisplayName ?? selected.Track) + ", Free Practice";
 
             if (selected != null && (loadPositionSave == null || !selected.SameSave(loadPositionSave) ||
                 (refreshed && !loadPosition.HasValue)))
@@ -153,16 +153,16 @@ internal static partial class RepeatCorner
         private static string DescribeStatus(bool connected, Save selected)
         {
             if (resets.WaitingForFocus) return "Switch back to ACC to continue";
-            if (resets.InProgress) return "Resetting · " + resets.Stage;
+            if (resets.InProgress) return "Resetting: " + resets.Stage;
             if (countdown != null)
             {
-                if (countdown.IsSuspended) return "Loop paused · return to driving";
+                if (countdown.IsSuspended) return "Loop paused until you drive again";
                 return countdown.RemainingSeconds < 0 ? "Announcing result" :
                     "Auto-reset in " + countdown.RemainingSeconds + " s";
             }
             if (loopSave != null) return "Loop armed";
             if (!connected) return "Start ACC to use the loop";
-            return selected == null ? "Choose a practice save" : "Ready · loop off";
+            return selected == null ? "Choose a practice save" : "Loop off";
         }
     }
 
