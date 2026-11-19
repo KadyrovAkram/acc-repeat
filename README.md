@@ -61,7 +61,7 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower, followed by your **Best** and the run's **Entry** and **Exit** speeds.
 
-The table lists your last five runs, newest first, with the newest marked **LAST**. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
+The table lists your last five runs, newest first, with the newest highlighted. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
 
 History is stored with the timing lines in `ACCRepeat.settings.json`. Moving either line starts a new history for that section.
 
