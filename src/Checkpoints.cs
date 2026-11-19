@@ -168,7 +168,7 @@ internal static partial class RepeatCorner
         store.SetCheckpointName(saves, selected, name);
         store.Save();
         DisableLoop("the active save changed");
-        ReportStatus("Active save: " + store.Settings.ActiveCheckpoint);
+        ReportStatus("Active save: " + store.Settings.ActiveCheckpoint, null);
     }
 
     private static void UseCheckpoint(string name)
@@ -179,7 +179,7 @@ internal static partial class RepeatCorner
         store.Settings.ActiveCheckpoint = pin.Name;
         store.Save();
         DisableLoop("the active save changed");
-        ReportStatus("Active save: " + pin.Name);
+        ReportStatus("Active save: " + pin.Name, null);
     }
 
     private static void UseLatest()

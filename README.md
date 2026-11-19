@@ -59,7 +59,7 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 ### Review your runs
 
-The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower, followed by your **Best** and the run's **Entry** and **Exit** speeds.
+The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower.
 
 The table lists your last five runs, newest first, with the newest highlighted. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
 

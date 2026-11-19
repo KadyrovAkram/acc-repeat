@@ -52,8 +52,10 @@ internal static partial class RepeatCorner
             store.Save();
             timer.Reset();
             DisableLoop("timing lines changed");
+            // The desk's empty run list already says what to do next.
             ReportStatus(start ? "Timing start marked on " + frame.Track + ". Mark the exit with Ctrl+Shift+L." :
-                "Timing finish marked. Reset and cross both timing lines to record a run.");
+                "Timing finish marked. Reset and cross both timing lines to record a run.",
+                start ? "Timing start marked." : "Timing finish marked.");
         }
         catch (Exception error)
         {
@@ -91,7 +93,8 @@ internal static partial class RepeatCorner
         store.Save();
         timer.Reset();
         DisableLoop("timing lines changed");
-        ReportStatus(message);
+        // The desk shows the new lines itself.
+        ReportStatus(message, null);
     }
 
     private static double WrapPosition(double position)

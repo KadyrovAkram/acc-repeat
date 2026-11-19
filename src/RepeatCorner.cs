@@ -117,11 +117,15 @@ internal static partial class RepeatCorner
         return 0;
     }
 
-    private static void ReportStatus(string message)
+    private static void ReportStatus(string message) { ReportStatus(message, message); }
+
+    // The console and log get the full message; the desk footer gets deskText, or keeps what
+    // it shows when deskText is null, e.g. for a change the desk already displays.
+    private static void ReportStatus(string message, string deskText)
     {
         Console.WriteLine(message);
         DiagnosticLog.Info(message);
-        if (desktopSession != null) desktopSession.Note(message);
+        if (desktopSession != null && deskText != null) desktopSession.Note(deskText);
     }
 
     private static void EnableDpiAwareness()

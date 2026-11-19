@@ -433,7 +433,6 @@ internal static partial class RepeatCorner
     {
         private readonly string name;
         private string value = "—";
-        private Color valueColor = Theme.Text;
 
         public Readout(string name)
         {
@@ -451,12 +450,6 @@ internal static partial class RepeatCorner
         {
             get { return value; }
             set { if (this.value != value) { this.value = value; AccessibleDescription = value; Invalidate(); } }
-        }
-
-        public Color ValueColor
-        {
-            get { return valueColor; }
-            set { if (valueColor != value) { valueColor = value; Invalidate(); } }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -477,7 +470,7 @@ internal static partial class RepeatCorner
                 int x = labelSize.Width + (int)(7 * scale);
                 TextRenderer.DrawText(graphics, value, Font,
                     new Rectangle(x, (int)(baseline - valueAscent), Math.Max(0, Width - x), Font.Height),
-                    Enabled ? valueColor : Theme.Faint, back, flags | TextFormatFlags.EndEllipsis);
+                    Enabled ? Theme.Text : Theme.Faint, back, flags | TextFormatFlags.EndEllipsis);
             }
         }
 

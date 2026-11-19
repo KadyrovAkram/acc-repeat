@@ -23,8 +23,6 @@ internal static partial class RepeatCorner
         session.Join();
     }
 
-    private static string FormatSpeed(double speed) { return speed.ToString("0") + " km/h"; }
-
     private sealed class PracticeDesk : Form
     {
         private readonly DesktopSession session;
@@ -46,9 +44,6 @@ internal static partial class RepeatCorner
         private readonly Label detail = Caption("", 9.5f);
         private readonly FlushLabel time = new FlushLabel(52, false) { Text = "—", BaselineInset = 14 };
         private readonly FlushLabel delta = new FlushLabel(12.5f, true);
-        private readonly Readout best = new Readout("Best");
-        private readonly Readout entry = new Readout("Entry");
-        private readonly Readout exit = new Readout("Exit");
         private readonly Label emptyHistory = Caption("Cross both timing lines to record a run.", 10);
         private readonly AttemptList history = new AttemptList { Dock = DockStyle.Fill, Visible = false };
         private TableLayoutPanel wheelRow;
@@ -195,7 +190,7 @@ internal static partial class RepeatCorner
             return sidebar;
         }
 
-        // The newest run's time leads; its delta and speeds sit under it, then the run history.
+        // The newest run's time leads with its delta under it, then the run history.
         private Control BuildResults()
         {
             var results = Stack(1);
@@ -203,16 +198,7 @@ internal static partial class RepeatCorner
             time.Font = Theme.Type(52, FontStyle.Bold);
             AddRow(results, time, 92);
             AddRow(results, delta, 28);
-            var readouts = Stack(3);
-            readouts.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            readouts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            readouts.Controls.Add(best, 0, 0);
-            readouts.Controls.Add(entry, 1, 0);
-            readouts.Controls.Add(exit, 2, 0);
-            AddRow(results, readouts, 34);
-            AddRow(results, new Panel { Margin = Padding.Empty }, 24);
+            AddRow(results, new Panel { Margin = Padding.Empty }, 30);
             var historySurface = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             historySurface.Controls.Add(history);
             emptyHistory.ForeColor = Theme.Muted;
@@ -220,7 +206,7 @@ internal static partial class RepeatCorner
             emptyHistory.Padding = new Padding(0, 4, 0, 0);
             historySurface.Controls.Add(emptyHistory);
             results.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            results.Controls.Add(historySurface, 0, 4);
+            results.Controls.Add(historySurface, 0, 3);
             return results;
         }
 
@@ -411,10 +397,6 @@ internal static partial class RepeatCorner
             var last = view.Recent.FirstOrDefault();
             time.Text = last == null ? "—" : last.Seconds.ToString("0.000");
             time.ForeColor = last == null ? Theme.Faint : IsBest(last, view.Best) ? Theme.Green : Theme.Text;
-            entry.Value = last == null ? "—" : FormatSpeed(last.EntrySpeed);
-            exit.Value = last == null ? "—" : FormatSpeed(last.ExitSpeed);
-            best.Value = view.Best == null ? "—" : view.Best.Seconds.ToString("0.000");
-            best.ValueColor = view.Best == null ? Theme.Text : Theme.Green;
 
             delta.Text = "";
             if (last != null && last.PreviousBestDelta.HasValue && last.PreviousBestDelta.Value < 0)

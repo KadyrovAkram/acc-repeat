@@ -23,7 +23,8 @@ internal static partial class RepeatCorner
         invalidSection = section;
         invalidRun = attempt;
         ReportStatus(string.Format("{0} wheel check: invalid {1:0.000} s. All tyres outside, nearest {2:0.00} m at X={3:0.0}, Z={4:0.0}.",
-            section.Track, attempt.Seconds, boundary.CutMetres, boundary.CutX, boundary.CutZ));
+            section.Track, attempt.Seconds, boundary.CutMetres, boundary.CutX, boundary.CutZ),
+            string.Format("{0:0.000} s run not counted: all four tyres went past the track limits.", attempt.Seconds));
     }
 
     private static bool SameRun(Attempt left, Attempt right)
