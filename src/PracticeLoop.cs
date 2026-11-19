@@ -42,7 +42,7 @@ internal static partial class RepeatCorner
         loopSave = save;
         loopDelay = delay;
         ReportStatus(string.Format("Hands-free loop armed for {0}. Auto-reset starts {1} s after the result callout.",
-            store.Settings.ActiveCheckpoint ?? save.Label, delay));
+            store.Settings.ActiveCheckpoint ?? save.Label, delay), null);
     }
 
     private static void StartLoopCountdown(Section section, string announcement)

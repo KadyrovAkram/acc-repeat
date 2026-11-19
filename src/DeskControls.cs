@@ -433,7 +433,6 @@ internal static partial class RepeatCorner
     {
         private readonly string name;
         private string value = "—";
-        private Color valueColor = Theme.Text;
 
         public Readout(string name)
         {
@@ -451,12 +450,6 @@ internal static partial class RepeatCorner
         {
             get { return value; }
             set { if (this.value != value) { this.value = value; AccessibleDescription = value; Invalidate(); } }
-        }
-
-        public Color ValueColor
-        {
-            get { return valueColor; }
-            set { if (valueColor != value) { valueColor = value; Invalidate(); } }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -477,7 +470,7 @@ internal static partial class RepeatCorner
                 int x = labelSize.Width + (int)(7 * scale);
                 TextRenderer.DrawText(graphics, value, Font,
                     new Rectangle(x, (int)(baseline - valueAscent), Math.Max(0, Width - x), Font.Height),
-                    Enabled ? valueColor : Theme.Faint, back, flags | TextFormatFlags.EndEllipsis);
+                    Enabled ? Theme.Text : Theme.Faint, back, flags | TextFormatFlags.EndEllipsis);
             }
         }
 
@@ -525,12 +518,6 @@ internal static partial class RepeatCorner
                     IsPersonalBest(recent[index]) ? "personal best" : DeltaText(recent[index]) + " to personal best");
             AccessibleDescription = string.Join("; ", lines);
             Invalidate();
-        }
-
-        // Only the newest run and a separately listed best need naming; the rest read top to bottom.
-        private string RunLabel(int index)
-        {
-            return index >= runs.Length ? "BEST" : index == 0 ? "LAST" : "";
         }
 
         private int RowHeight { get { return (int)(36 * paintScale); } }
@@ -587,7 +574,7 @@ internal static partial class RepeatCorner
             graphics.Clear(BackColor);
             int rowHeight = RowHeight, headerHeight = HeaderHeight;
             int inset = (int)(10 * scale);
-            float[] widths = { 0.14f, 0.22f, 0.22f, 0.21f, 0.21f };
+            float[] widths = { 0.26f, 0.26f, 0.24f, 0.24f };
             int tableWidth = Math.Max(0, Width - (int)(RemoveBox(0).Width + 12 * scale));
             var columns = new int[widths.Length + 1];
             columns[0] = inset;
@@ -599,7 +586,7 @@ internal static partial class RepeatCorner
             using (var strong = Theme.Strong(11))
             using (var line = new Pen(Theme.Line))
             {
-                string[] headings = { "", "TIME", "DELTA", "ENTRY KM/H", "EXIT KM/H" };
+                string[] headings = { "TIME", "DELTA", "ENTRY KM/H", "EXIT KM/H" };
                 for (int index = 0; index < headings.Length; index++)
                     Cell(graphics, headings[index], label, Theme.Muted, columns, index, 0, headerHeight);
                 graphics.DrawLine(line, 0, headerHeight - 1, Width, headerHeight - 1);
@@ -612,14 +599,16 @@ internal static partial class RepeatCorner
                     if (row == hoverRow || row == 0)
                         Theme.Fill(graphics, row == hoverRow ? Theme.RowHover : Theme.Surface,
                             new RectangleF(0, top, Width, rowHeight - 1));
-                    Cell(graphics, RunLabel(row), label, Theme.Muted, columns, 0, top, rowHeight);
-                    Cell(graphics, run.Seconds.ToString("0.000"), strong, personalBest ? Theme.Green : Theme.Text, columns, 1, top, rowHeight);
+                    // A best that dropped out of the recent runs sits below a heavier rule.
+                    if (row == runs.Length && row > 0)
+                        Theme.Fill(graphics, Theme.Muted, new RectangleF(0, top - 1, Width, 2 * scale));
+                    Cell(graphics, run.Seconds.ToString("0.000"), strong, personalBest ? Theme.Green : Theme.Text, columns, 0, top, rowHeight);
                     if (personalBest)
-                        Cell(graphics, "PB", strong, Theme.Green, columns, 2, top, rowHeight);
+                        Cell(graphics, "PB", strong, Theme.Green, columns, 1, top, rowHeight);
                     else if (best != null)
-                        Cell(graphics, DeltaText(run), strong, Theme.Yellow, columns, 2, top, rowHeight);
-                    Cell(graphics, run.EntrySpeed.ToString("0"), Font, Theme.Muted, columns, 3, top, rowHeight);
-                    Cell(graphics, run.ExitSpeed.ToString("0"), Font, Theme.Muted, columns, 4, top, rowHeight);
+                        Cell(graphics, DeltaText(run), strong, Theme.Yellow, columns, 1, top, rowHeight);
+                    Cell(graphics, run.EntrySpeed.ToString("0"), Font, Theme.Muted, columns, 2, top, rowHeight);
+                    Cell(graphics, run.ExitSpeed.ToString("0"), Font, Theme.Muted, columns, 3, top, rowHeight);
                     graphics.DrawLine(line, 0, top + rowHeight - 1, Width, top + rowHeight - 1);
                     if (row == hoverRow) PaintRemove(graphics, RemoveBox(row), scale);
                 }

@@ -39,7 +39,7 @@ Pins refer to ACC's original saves. Keep the pinned save among the first five ro
 
 1. Save **before** the place where you want timing to start. Select the pin first if you want the timing lines attached to it.
 2. With ACC focused, press **Ctrl+Shift+K** to mark the start line, such as just before your first braking point, and **Ctrl+Shift+L** to mark the finish line, such as after the last corner exit. Set the finish less than half a lap ahead of the start. You can mark either line while paused on track.
-3. Reset and cross both lines in order. The app shows the section time, your entry and exit speeds, and where the lines are on the lap.
+3. Reset and cross both lines in order. The app shows the section time and your entry and exit speeds. Select **Set on map…** to see where the lines are on the lap.
 
 Timing lines belong to the active pin or, in latest-save mode, the current track, and are saved with it. You only need to set them once per pin. Marking a new start line clears that section's previous finish line.
 
@@ -59,9 +59,9 @@ Use **Import map…** to load a custom Race Element ACC `.bin` for the selected 
 
 ### Review your runs
 
-The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower, followed by your **Best** and the run's **Entry** and **Exit** speeds.
+The large time at the top is your latest run. Below it, its delta is green when it set a new PB and yellow when it was slower.
 
-The table lists your last five runs, newest first, with the newest marked **LAST**. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
+The table lists your last five runs, newest first, with the newest highlighted. The **DELTA** column shows each run's delta to your current PB in yellow, and **PB** in green marks a run that matches your best. Your PB stays saved after it drops out of the recent list.
 
 History is stored with the timing lines in `ACCRepeat.settings.json`. Moving either line starts a new history for that section.
 

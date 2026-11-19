@@ -46,7 +46,7 @@ internal static partial class RepeatCorner
         store.Settings.Overlay = position;
         store.Save();
         ReportStatus(position == "Off" ? "In-game overlay off." :
-            "In-game overlay shown at the " + position.ToLowerInvariant() + " of the ACC window.");
+            "In-game overlay shown at the " + position.ToLowerInvariant() + " of the ACC window.", null);
     }
 
     private sealed class GameOverlay : NativeWindow, IDisposable
