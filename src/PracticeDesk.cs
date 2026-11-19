@@ -441,7 +441,7 @@ internal static partial class RepeatCorner
 
         private static string FormatMarker(double? marker)
         {
-            return marker.HasValue ? marker.Value.ToString("0.00%") : "—";
+            return marker.HasValue ? "Set" : "Not set";
         }
 
         private static TableLayoutPanel Stack(int columns)
